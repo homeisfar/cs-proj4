@@ -76,9 +76,9 @@ byte_to_sector (const struct inode *inode, off_t pos)
   }
   bytepos = pos % 512;
 
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  else
+  // if (pos < inode->data.length)
+  //   return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+  // else
     return -1;
 }
 
