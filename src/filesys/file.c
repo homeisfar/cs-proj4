@@ -8,9 +8,8 @@ struct file
   {
     struct inode *inode;        /* File's inode. */
     off_t pos;                  /* Current position. */
-    off_t idx;                  /* index of byte */
-    off_t idx2;                 /* index of which array */
-    // off_t idx3;                 /* index telling us which array in d_indirect */
+    // off_t idx;                  /* index of byte */
+    // off_t idx2;                 /* index of which array */
     bool deny_write;            /* Has file_deny_write() been called? */
   };
 

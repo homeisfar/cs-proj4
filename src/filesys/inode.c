@@ -59,27 +59,26 @@ byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
 
-  off_t idx, idx2, bytepos;
+  off_t idx, idx2;
 
-  bytepos = pos / 512;
+  pos = pos / 512;
   if (pos < DIRECTNUM) //direct index
+  {
     idx = pos;
-
+    return inode->data->direct[idx];
+  }
   else if (pos < 128 + DIRECTNUM) //indirect index
+  {
     idx = (pos - DIRECTNUM);
-
+    return inode->data->indirect[idx];
+  }
   else //double indirect values
   {
     //d_indirect[idx][idx2];
     idx = (pos - (DIRECTNUM + 128) / 128);
     idx2 = (pos - (DIRECTNUM + 128) % 128);
+    return inode->data->d_indirect[idx][idx2];
   }
-  bytepos = pos % 512;
-
-  // if (pos < inode->data.length)
-  //   return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  // else
-    return -1;
 }
 
 /* List of open inodes, so that opening a single inode twice
