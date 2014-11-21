@@ -10,7 +10,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define DIRECTNUM 123
+#define DIRECTNUM 122
 
 
 /* On-disk inode.
@@ -19,8 +19,9 @@ struct inode_disk
   {
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
+    int counter;
     unsigned magic;                     /* Magic number. */
-    block_sector_t direct[DIRECTNUM];               /* Not used. */
+    block_sector_t direct[DIRECTNUM];   /* Not used. */
     struct inode_indirection *indirect;
     struct inode_indirection **d_indirect;
   };
@@ -65,19 +66,19 @@ byte_to_sector (const struct inode *inode, off_t pos)
   if (pos < DIRECTNUM) //direct index
   {
     idx = pos;
-    return inode->data->direct[idx];
+    return inode->data.direct[idx];
   }
   else if (pos < 128 + DIRECTNUM) //indirect index
   {
     idx = (pos - DIRECTNUM);
-    return inode->data->indirect[idx];
+    return &inode->data.indirect->pointers[idx];
   }
   else //double indirect values
   {
     //d_indirect[idx][idx2];
     idx = (pos - (DIRECTNUM + 128) / 128);
     idx2 = (pos - (DIRECTNUM + 128) % 128);
-    return inode->data->d_indirect[idx][idx2];
+    return inode->data.d_indirect[idx]->pointers[idx2];
   }
 }
 
