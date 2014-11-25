@@ -21,8 +21,8 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
     block_sector_t direct[DIRECTNUM];   /* Not used. */
-    struct inode_indirection *indirect;
-    struct inode_indirection **d_indirect;
+    struct inode_indirection *indirect; /* ES MUY MALO */
+    struct inode_indirection **d_indirect; /* ES MUY MALO */
   };
 
 struct inode_indirection
