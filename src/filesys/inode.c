@@ -164,6 +164,8 @@ inode_create (block_sector_t sector, off_t length)
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
   size_t sectors = bytes_to_sectors (length);
+  // printf ("SECTORS\n %d \n", sectors);
+  // PANIC ("SECOTRS: %d", sectors);
   ASSERT (free_map_count (sectors)); // TODO: Check to see if this is how we handle running out of space
 
   disk_inode = calloc (1, sizeof *disk_inode);
@@ -172,8 +174,16 @@ inode_create (block_sector_t sector, off_t length)
     disk_inode->length = length;
     disk_inode->magic = INODE_MAGIC;
     
+    block_sector_t *temp = index_to_index (0, disk_inode);
+    block_sector_t temp2 = &disk_inode->direct[0];
+
+    if (temp == temp2)
+      PANIC ("TRUE %d", temp);
+    else
+      PANIC ("FALSE %d", temp);
     if (free_map_allocate (1, index_to_index (0, disk_inode)))
       block_write (fs_device, sector, disk_inode);
+    disk_inode->start = disk_inode->direct[0];
     int i = 1;
     static char zeros[BLOCK_SECTOR_SIZE];
     while (i < sectors)
