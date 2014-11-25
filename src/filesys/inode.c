@@ -9,6 +9,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
+#define DIRECTNUM 123
 
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
@@ -17,7 +18,9 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    block_sector_t direct[DIRECTNUM];         
+    block_sector_t indirect;
+    block_sector_t d_indirect;
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -44,11 +47,42 @@ struct inode
    Returns -1 if INODE does not contain data for a byte at offset
    POS. */
 static block_sector_t
-byte_to_sector (const struct inode *inode, off_t pos) 
+byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
+  off_t indirect_size = 128;
+
   if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+    {
+      off_t index = pos / BLOCK_SECTOR_SIZE;
+      if (index < DIRECTNUM)
+        {
+          return inode->data.direct[index];
+        }
+      else if (index < (DIRECTNUM + indirect_size))
+        {
+          block_sector_t ret[128];
+          // COMMENT: Reading contents of indirect sector into ret buffer
+          block_read (fs_device, inode->data.indirect, &ret);                    // COMMENT: Obtaining desired sector
+          // COMMENT: Obtaining desired sector
+          return ret[index - DIRECTNUM];
+        }
+      else
+        {
+          block_sector_t first_indir[128];
+          block_sector_t second_indir[128];
+          off_t dbl_indirect = (index - (DIRECTNUM + indirect_size)) / 128;
+          off_t dbl_index = (index - (DIRECTNUM + indirect_size)) % 128;
+
+          // COMMENT: Reading contents of outer indirect sector into
+          // first_indir buffer
+          block_read (fs_device, inode->data.d_indirect, &first_indir);
+          // COMMENT: Reading contents of a indirect sector into second_indir
+          block_read (fs_device, first_indir[dbl_indirect], &second_indir);
+          // COMMENT: Obtaining desired sector from inner indirect sector
+          return second_indir[dbl_index];
+        }
+    }
   else
     return -1;
 }
