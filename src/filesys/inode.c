@@ -158,7 +158,7 @@ bool
 inode_create (block_sector_t sector, off_t length)
 {
   struct inode_disk *disk_inode = NULL;
-  bool success = false;
+  bool success = true;
   ASSERT (length >= 0);
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
@@ -190,13 +190,18 @@ inode_create (block_sector_t sector, off_t length)
     static char zeros[BLOCK_SECTOR_SIZE];
     while (i < sectors)
     {
-      printf("SECTORS AND I %d %d", sectors, i);
+      // printf("SECTORS AND I %d %d", sectors, i);
       if(free_map_allocate (1, index_to_index (i, disk_inode)))
       {
-        block_write (fs_device, *index_to_index (i, disk_inode), zeros);
+        block_sector_t *bst = index_to_index (i, disk_inode);
+        block_write (fs_device, *bst, zeros);
       }
+      else
+        success = false;
     }
+    free (disk_inode);
   }
+  return success;
 }
 
 
@@ -381,7 +386,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
         {
-          PANIC ("SECTOR IDX %d", sector_idx);
+          // PANIC ("SECTOR IDX %d", sector_idx);
           /* Write full sector directly to disk. */
           block_write (fs_device, sector_idx, buffer + bytes_written);
         }
