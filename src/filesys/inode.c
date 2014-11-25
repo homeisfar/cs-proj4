@@ -174,11 +174,13 @@ inode_create (block_sector_t sector, off_t length)
     disk_inode->length = length;
     disk_inode->magic = INODE_MAGIC;
     
-    block_sector_t temp = index_to_index (0, disk_inode);
-    block_sector_t temp2 = &disk_inode->direct[0];
+    // block_sector_t temp = index_to_index (0, disk_inode);
+    // block_sector_t temp2 = disk_inode->direct[0];
 
     // if (temp == temp2)
-      // PANIC ("TRUE %d", temp);
+      // PANIC ("TRUE %d", temp2);
+     // block_sector_t *bb = byte_to_sector(disk_inode, 0);
+    // PANIC ("%d", *bb);
     // else
       // PANIC ("FALSE %d", temp);
     if (free_map_allocate (1, index_to_index (0, disk_inode)))
@@ -188,6 +190,7 @@ inode_create (block_sector_t sector, off_t length)
     static char zeros[BLOCK_SECTOR_SIZE];
     while (i < sectors)
     {
+      printf("SECTORS AND I %d %d", sectors, i);
       if(free_map_allocate (1, index_to_index (i, disk_inode)))
       {
         block_write (fs_device, *index_to_index (i, disk_inode), zeros);
@@ -299,7 +302,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   while (size > 0)
     {
       /* Disk sector to read, starting byte offset within sector. */
-      block_sector_t sector_idx = byte_to_sector (inode, offset);
+      block_sector_t *sector_idx_temp = byte_to_sector (inode, offset);
+      block_sector_t sector_idx = *sector_idx_temp;
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -360,7 +364,9 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   while (size > 0)
     {
       /* Sector to write, starting byte offset within sector. */
-      block_sector_t sector_idx = byte_to_sector (inode, offset);
+      // PANIC ("OFFSET: %d", offset);
+      block_sector_t *sector_idx_temp = byte_to_sector (inode, offset);
+      block_sector_t sector_idx = *sector_idx_temp;
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -375,6 +381,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
         {
+          PANIC ("SECTOR IDX %d", sector_idx);
           /* Write full sector directly to disk. */
           block_write (fs_device, sector_idx, buffer + bytes_written);
         }
