@@ -65,19 +65,19 @@ byte_to_sector (const struct inode *inode, off_t pos)
   if (pos < DIRECTNUM) //direct index
   {
     idx = pos;
-    return inode->data.direct[idx];
+    return &inode->data.direct[idx];
   }
   else if (pos < 128 + DIRECTNUM) //indirect index
   {
     idx = (pos - DIRECTNUM);
-    return inode->data.indirect->pointers[idx];
+    return &inode->data.indirect->pointers[idx];
   }
   else //double indirect values
   {
     //d_indirect[idx][idx2];
     idx = (pos - (DIRECTNUM + 128) / 128);
     idx2 = (pos - (DIRECTNUM + 128) % 128);
-    return inode->data.d_indirect[idx]->pointers[idx2];
+    return &inode->data.d_indirect[idx]->pointers[idx2];
   }
 }
 
@@ -87,18 +87,18 @@ index_to_index (int index, struct inode_disk *inode)
 {
   int idx, idx2;
   if (index < DIRECTNUM)
-    return inode->direct[index];
+    return &inode->direct[index];
   else if (index < 128 + DIRECTNUM) //indirect index
   {
     idx = (index - DIRECTNUM);
-    return inode->indirect->pointers[idx];
+    return &inode->indirect->pointers[idx];
   }
   else //double indirect values
   {
     //d_indirect[idx][idx2];
     idx = (index - (DIRECTNUM + 128) / 128);
     idx2 = (index - (DIRECTNUM + 128) % 128);
-    return inode->d_indirect[idx]->pointers[idx2];
+    return &inode->d_indirect[idx]->pointers[idx2];
   }
 }
 
@@ -174,13 +174,13 @@ inode_create (block_sector_t sector, off_t length)
     disk_inode->length = length;
     disk_inode->magic = INODE_MAGIC;
     
-    block_sector_t *temp = index_to_index (0, disk_inode);
+    block_sector_t temp = index_to_index (0, disk_inode);
     block_sector_t temp2 = &disk_inode->direct[0];
 
-    if (temp == temp2)
-      PANIC ("TRUE %d", temp);
-    else
-      PANIC ("FALSE %d", temp);
+    // if (temp == temp2)
+      // PANIC ("TRUE %d", temp);
+    // else
+      // PANIC ("FALSE %d", temp);
     if (free_map_allocate (1, index_to_index (0, disk_inode)))
       block_write (fs_device, sector, disk_inode);
     disk_inode->start = disk_inode->direct[0];
