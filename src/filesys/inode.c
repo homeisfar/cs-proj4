@@ -55,24 +55,29 @@ byte_to_sector (const struct inode *inode, off_t pos)
   if (pos < inode->data.length)
     {
       off_t index = pos / BLOCK_SECTOR_SIZE;
-      if (index < DIRECTNUM)
+      off_t offset_index = index - 1;
+      if (index == 0)
         {
-          return inode->data.direct[index];
+          return inode->data.start;
         }
-      else if (index < (DIRECTNUM + indirect_size))
+      else if (offset_index < DIRECTNUM)
+        {
+          return inode->data.direct[offset_index];
+        }
+      else if (offset_index < (DIRECTNUM + indirect_size))
         {
           block_sector_t ret[128];
           // COMMENT: Reading contents of indirect sector into ret buffer
           block_read (fs_device, inode->data.indirect, &ret);                    // COMMENT: Obtaining desired sector
           // COMMENT: Obtaining desired sector
-          return ret[index - DIRECTNUM];
+          return ret[offset_index - DIRECTNUM];
         }
       else
         {
           block_sector_t first_indir[128];
           block_sector_t second_indir[128];
-          off_t dbl_indirect = (index - (DIRECTNUM + indirect_size)) / 128;
-          off_t dbl_index = (index - (DIRECTNUM + indirect_size)) % 128;
+          off_t dbl_indirect = (offset_index - (DIRECTNUM + indirect_size)) / 128;
+          off_t dbl_index = (offset_index - (DIRECTNUM + indirect_size)) % 128;
 
           // COMMENT: Reading contents of outer indirect sector into
           // first_indir buffer
@@ -110,6 +115,8 @@ inode_create (block_sector_t sector, off_t length)
   bool success = false;
 
   ASSERT (length >= 0);
+  size_t sectors = bytes_to_sectors (length);
+  ASSERT (free_map_count (sectors));
 
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
@@ -118,19 +125,28 @@ inode_create (block_sector_t sector, off_t length)
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-      size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
-      if (free_map_allocate (sectors, &disk_inode->start)) 
+
+
+      if (free_map_allocate (1, &disk_inode->start)) 
         {
           block_write (fs_device, sector, disk_inode);
           if (sectors > 0) 
             {
               static char zeros[BLOCK_SECTOR_SIZE];
               size_t i;
+              block_sector_t alloc_sector;
               
-              for (i = 0; i < sectors; i++) 
-                block_write (fs_device, disk_inode->start + i, zeros);
+              // Need to add extension capability
+              while (i < sectors) 
+                {
+                  //alloc_sector = byte_to_sector (/*inode*/, i * BLOCK_SECTOR_SIZE);
+                  if (alloc_sector == -1 || !free_map_allocate (1, &alloc_sector)) 
+                    return false;
+                  block_write (fs_device, alloc_sector, zeros);
+                  i++;
+                }
             }
           success = true; 
         } 
