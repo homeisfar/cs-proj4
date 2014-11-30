@@ -112,7 +112,6 @@ inode_init (void)
    device.
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
-// TODO: Free allocated memory if fails halfway
 bool
 inode_create (block_sector_t sector, off_t length)
 {
@@ -144,26 +143,28 @@ inode_create (block_sector_t sector, off_t length)
           if (sectors > 0) 
             {
               static char zeros[BLOCK_SECTOR_SIZE];
-              size_t i;
+              size_t i = 0;
               block_sector_t alloc_sector;
 	      off_t count_len = length;
+	      // Really not sure how to get new inode struct
+	      struct inode *new_inode = inode_open (sector);
               
               // Adding extension capability
               while (i < sectors) 
                 {
 		  // Allocate indirect pointer blocks as needed
-		  if (!boundary_sectors (disk_inode, BLOCK_SECTOR_SIZE))
+		  if (!boundary_sectors (new_inode, BLOCK_SECTOR_SIZE))
 		    {
-		      release_sectors (disk_inode);
+		      release_sectors (new_inode);
 		      free (disk_inode);
 		      return false;
 		    }
 		  // Obtain free space
-                  alloc_sector = extend_by_one (disk_inode);
+                  alloc_sector = extend_by_one (new_inode);
 		  // If failed, exit
 		  if (alloc_sector == -1)
 		    {
-		      release_sectors (disk_inode);
+		      release_sectors (new_inode);
 		      free (disk_inode);
 		      return false;
 		    }
@@ -479,8 +480,8 @@ inode_length (const struct inode *inode)
 // intended length of file.
 
 /* Allocates indirect pointer block(s) if extending file by given size will
-   need it. Returns -1 on failure */
-off_t
+   need it. Returns -1 on failure. Does not allocate data blocks! */
+int
 boundary_sectors (struct inode *inode, off_t size)
 {
   off_t direct_pointers = DIRECTNUM + 1;  // inode->data.start included
@@ -518,7 +519,7 @@ boundary_sectors (struct inode *inode, off_t size)
 	   ((fut_alloc - in_direct_ptrs) % doubly_indirect == 0))
     {
       block_sector_t second_indirect;
-      off_t dbl_idx = (fut_alloc - in_direct_ptrs) / 128;
+      //off_t dbl_idx = (fut_alloc - in_direct_ptrs) / 128;
       if (!free_map_count (1) || !free_map_allocate (1, &second_indirect))
 	return -1;
       // Write location of new doubly indirect block into first block
@@ -530,7 +531,7 @@ boundary_sectors (struct inode *inode, off_t size)
 /* Returns a single allocated block sector number if successful; returns 
    -1 on failure. Currently does not consider cases where there is space
    remaining in an already-allocated inode. Does not increase recorded inode
-   length. */
+   length. Excludes cases covered by boundary_sector. */
 static block_sector_t
 extend_by_one (struct inode *inode)
 {
@@ -546,19 +547,23 @@ extend_by_one (struct inode *inode)
   if (next_idx < direct)
     inode->data.direct[next_idx] = alloc_sec;
   else if (next_idx < indirect)
-    // Need to double-check if <inode->data.indirect> actually
-    // gives the sector number
-    block_write (fs_device, inode->data.indirect, alloc_sec);
+    {
+      // Does block_write automatically write at the end of
+      // allocated space?
+      block_write (fs_device, inode->data.indirect, alloc_sec);
+    }
   else
     {      
-      block_sector_t dbl_next_idx;
+      block_sector_t dbl_out_idx[128];
+      block_sector_t dbl_inn_idx[128];
       off_t dbl_index = (next_idx - indirect) / 128;
-      off_t double_indirect = (next_idx - indirect) % 128;
+      //off_t double_indirect = (next_idx - indirect) % 128;
 
       // Get inner indirection block sector #
-      block_read (fs_device, inode->data.d_indirect, dbl_next_idx);
-      // Write to inner indirection block
-      block_write (fs_device, dbl_next_idx, alloc_sec);
+      block_read (fs_device, inode->data.d_indirect, &dbl_out_idx);
+      block_read (fs_device, dbl_out_idx[dbl_index], &dbl_inn_idx);
+      // Write to inner indirection block; same Q as above.
+      block_write (fs_device, dbl_inn_idx, alloc_sec);
     }
 
   return alloc_sec; 
@@ -567,12 +572,12 @@ extend_by_one (struct inode *inode)
 
 // Currently assumes presence of 'parent' inode pointer, which is the stuct 
 // that holds the inode disk. Designed for use in inode_create. Deallocates 
-// all the block sectors in a given inode disk.
+// all the block sectors in a given inode, but not the inode struct itself(?)
 void
 release_sectors (struct inode *inode)
 {
-  block_sector_t dealloc;
-  off_t num_blocks;
+  block_sector_t dealloc = 0;
+  off_t num_blocks = 0;
   // Deallocate data blocks
   while (dealloc != -1)
     {
@@ -590,11 +595,11 @@ release_sectors (struct inode *inode)
     {
       // Indirect blocks
       off_t indir = (num_blocks - (DIRECTNUM + 129)) / 128;
-      block_sector_t dbl_indir;
+      block_sector_t dbl_indir[128];
       while (indir >= 0)
 	{
 	  block_read (fs_device, inode->data.d_indirect, &dbl_indir);
-	  free_map_release (dbl_indir, 1);
+	  free_map_release (dbl_indir[indir], 1);
 	  indir--;
 	}
       free_map_release (inode->data.d_indirect, 1);
