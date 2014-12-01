@@ -138,10 +138,8 @@ inode_create (block_sector_t sector, off_t length)
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
-      // disk_inode->length = length;
-      disk_inode->length = 0;
+      disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
-
 
       if (free_map_allocate (1, &disk_inode->start)) 
         {
@@ -151,91 +149,42 @@ inode_create (block_sector_t sector, off_t length)
               static char zeros[BLOCK_SECTOR_SIZE];
               size_t i = 0;
               block_sector_t alloc_sector;
-              off_t count_len = length;
-      	      // Really not sure how to get new inode struct
-      	      // TODO: ROOT OF ISSUE IS PROBABLY HERE?
-      	      //struct inode *new_inode = inode_open (sector);
+/* Does this actually open the inode for writing to?
+    If this is the approach, we probably need to complete inode_close too */              
+      	      struct inode *new_inode = inode_open (sector);
 
               // Adding extension capability
               while (i < sectors) 
                 {
             		  // Allocate indirect pointer blocks as needed
-            		  // if (boundary_sectors (new_inode, BLOCK_SECTOR_SIZE) == -1)
-            		  //   {
-            		  //     release_sectors (new_inode);
-            		  //     free (disk_inode);
-            		  //     return false;
-            		  //   }
+            		  if (boundary_sectors (new_inode, BLOCK_SECTOR_SIZE) == -1)
+            		    {
+            		      release_sectors (new_inode);
+            		      free (disk_inode);
+            		      return false;
+            		    }
             		  // Obtain free space
-///
-  block_sector_t alloc_sec;
-  off_t next_idx = disk_inode->length / 512;
-  off_t direct = DIRECTNUM + 1;
-  off_t indirect = direct + 128;
 
-  //ASSERT(free_map_count(1));
-  // Checks & allocates if enough filesys space present for extension
-  if (!free_map_count (1) || !free_map_allocate (1, &alloc_sec))
-    return -1;
-
-  if (next_idx < direct)
-    disk_inode->direct[next_idx] = alloc_sec;
-  else if (next_idx < indirect)
-    {
-      // Does block_write automatically write at the end of
-      // allocated space?
-      block_write (fs_device, disk_inode->indirect, alloc_sec);
-    }
-  else
-    {      
-      block_sector_t dbl_out_idx[128];
-      block_sector_t dbl_inn_idx[128];
-      off_t dbl_index = (next_idx - indirect) / 128;
-      //off_t double_indirect = (next_idx - indirect) % 128;
-
-      // Get inner indirection block sector #
-      block_read (fs_device, disk_inode->d_indirect, &dbl_out_idx);
-      block_read (fs_device, dbl_out_idx[dbl_index], &dbl_inn_idx);
-      // Write to inner indirection block; same Q as above.
-      block_write (fs_device, dbl_inn_idx, alloc_sec);
-    }
-
-
-
-///
-                  alloc_sector = alloc_sec;
+/*Idea behind this call was to allocate space into new inode and return it */
+                  alloc_sector = extend_by_one (new_inode);
             		  // If failed, exit
             		  if (alloc_sector == -1)
             		    {
-            		      //release_sectors (new_inode);
+            		      release_sectors (new_inode);
             		      free (disk_inode);
             		      return false;
             		    }
             		  // Write to newly allocated sector
                   block_write (fs_device, alloc_sector, zeros);
-            		  // Making sure created file is of correct length
-            		  if (count_len < BLOCK_SECTOR_SIZE)
-            		    {
-            		      disk_inode->length = disk_inode->length + count_len;
-            		      ASSERT (disk_inode->length == length);
-            		    }
-            		  else
-            		    {
-            		      disk_inode->length = disk_inode->length + BLOCK_SECTOR_SIZE;
-            		      count_len = count_len - BLOCK_SECTOR_SIZE;
-            		    }
         		      i++;
         		    }
             }
-          else
-            {
-              // If created file does not have more sectors, no length count needed
-      	      disk_inode->length = length;
-      	    }
           success = true; 
         } 
+        printf ("disk %i, sector %i \n", disk_inode->direct[0], inode_open(sector)->data.direct[0]);
       free (disk_inode);
     }
+  // printf("Well %i, sector %i \n", inode_open(sector)->data.start, sector);
   return success;
 }
 
@@ -310,9 +259,10 @@ inode_close (struct inode *inode)
       /* Deallocate blocks if removed. */
       if (inode->removed) 
         {
+          release_sectors (inode);
           free_map_release (inode->sector, 1);
-          free_map_release (inode->data.start,
-                            bytes_to_sectors (inode->data.length)); 
+          // free_map_release (inode->data.start,
+          //                   bytes_to_sectors (inode->data.length)); 
         }
 
       free (inode); 
@@ -526,7 +476,7 @@ boundary_sectors (struct inode *inode, off_t size)
     {
       block_sector_t alloc_sec;
       if (!free_map_count (1) || !free_map_allocate (1, &alloc_sec))
-	return -1;
+        return -1;
       inode->data.indirect = alloc_sec;
     }
   // Add two block sectors if entering doubly indirect pointers
@@ -535,8 +485,8 @@ boundary_sectors (struct inode *inode, off_t size)
       block_sector_t first_indirect;
       block_sector_t second_indirect;
       if (!free_map_count (2) || !free_map_allocate (1, &first_indirect)
-	  || !free_map_allocate (1, &second_indirect))
-	return -1;
+      	  || !free_map_allocate (1, &second_indirect))
+      	return -1;
       // Assign first indirection block to inode
       inode->data.d_indirect = first_indirect;
       // Write location of second indirection block into first block
@@ -549,7 +499,7 @@ boundary_sectors (struct inode *inode, off_t size)
       block_sector_t second_indirect;
       //off_t dbl_idx = (fut_alloc - in_direct_ptrs) / 128;
       if (!free_map_count (1) || !free_map_allocate (1, &second_indirect))
-	return -1;
+	      return -1;
       // Write location of new doubly indirect block into first block
       block_write (fs_device, inode->data.d_indirect, second_indirect);
     }
@@ -564,8 +514,8 @@ static block_sector_t
 extend_by_one (struct inode *inode)
 {
   block_sector_t alloc_sec;
-  off_t next_idx = inode->data.length / 512;
-  off_t direct = DIRECTNUM + 1;
+  off_t next_idx = inode->data.length / 512 - 1; // minus 1 to account for .start
+  off_t direct = DIRECTNUM;
   off_t indirect = direct + 128;
 
   // Checks & allocates if enough filesys space present for extension
