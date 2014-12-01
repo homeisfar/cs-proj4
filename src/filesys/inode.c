@@ -46,6 +46,12 @@ struct inode
     struct inode_disk data;             /* Inode content. */
   };
 
+int
+test (struct inode_disk *d_inode)
+{
+  return d_inode->length;
+}
+
 /* Returns the block device sector that contains byte offset POS
    within INODE.
    Returns -1 if INODE does not contain data for a byte at offset
@@ -145,51 +151,87 @@ inode_create (block_sector_t sector, off_t length)
               static char zeros[BLOCK_SECTOR_SIZE];
               size_t i = 0;
               block_sector_t alloc_sector;
-	      off_t count_len = length;
-	      // Really not sure how to get new inode struct
-	      struct inode *new_inode = inode_open (sector);
-              
+              off_t count_len = length;
+      	      // Really not sure how to get new inode struct
+      	      // TODO: ROOT OF ISSUE IS PROBABLY HERE?
+      	      //struct inode *new_inode = inode_open (sector);
+
               // Adding extension capability
               while (i < sectors) 
                 {
-		  // Allocate indirect pointer blocks as needed
-		  if (!boundary_sectors (new_inode, BLOCK_SECTOR_SIZE))
-		    {
-		      release_sectors (new_inode);
-		      free (disk_inode);
-		      return false;
-		    }
-		  // Obtain free space
-                  alloc_sector = extend_by_one (new_inode);
-		  // If failed, exit
-		  if (alloc_sector == -1)
-		    {
-		      release_sectors (new_inode);
-		      free (disk_inode);
-		      return false;
-		    }
-		  // Write to newly allocated sector
-                  block_write (fs_device, alloc_sector, zeros);
+            		  // Allocate indirect pointer blocks as needed
+            		  // if (boundary_sectors (new_inode, BLOCK_SECTOR_SIZE) == -1)
+            		  //   {
+            		  //     release_sectors (new_inode);
+            		  //     free (disk_inode);
+            		  //     return false;
+            		  //   }
+            		  // Obtain free space
+///
+  block_sector_t alloc_sec;
+  off_t next_idx = disk_inode->length / 512;
+  off_t direct = DIRECTNUM + 1;
+  off_t indirect = direct + 128;
 
-		  // Making sure created file is of correct length
-		  if (count_len < BLOCK_SECTOR_SIZE)
-		    {
-		      disk_inode->length = disk_inode->length + count_len;
-		      ASSERT (disk_inode->length == length);
-		    }
-		  else
-		    {
-		      disk_inode->length = disk_inode->length + BLOCK_SECTOR_SIZE;
-		      count_len = count_len - BLOCK_SECTOR_SIZE;
-		    }
-                  i++;
-                }
+  //ASSERT(free_map_count(1));
+  // Checks & allocates if enough filesys space present for extension
+  if (!free_map_count (1) || !free_map_allocate (1, &alloc_sec))
+    return -1;
+
+  if (next_idx < direct)
+    disk_inode->direct[next_idx] = alloc_sec;
+  else if (next_idx < indirect)
+    {
+      // Does block_write automatically write at the end of
+      // allocated space?
+      block_write (fs_device, disk_inode->indirect, alloc_sec);
+    }
+  else
+    {      
+      block_sector_t dbl_out_idx[128];
+      block_sector_t dbl_inn_idx[128];
+      off_t dbl_index = (next_idx - indirect) / 128;
+      //off_t double_indirect = (next_idx - indirect) % 128;
+
+      // Get inner indirection block sector #
+      block_read (fs_device, disk_inode->d_indirect, &dbl_out_idx);
+      block_read (fs_device, dbl_out_idx[dbl_index], &dbl_inn_idx);
+      // Write to inner indirection block; same Q as above.
+      block_write (fs_device, dbl_inn_idx, alloc_sec);
+    }
+
+
+
+///
+                  alloc_sector = alloc_sec;
+            		  // If failed, exit
+            		  if (alloc_sector == -1)
+            		    {
+            		      //release_sectors (new_inode);
+            		      free (disk_inode);
+            		      return false;
+            		    }
+            		  // Write to newly allocated sector
+                  block_write (fs_device, alloc_sector, zeros);
+            		  // Making sure created file is of correct length
+            		  if (count_len < BLOCK_SECTOR_SIZE)
+            		    {
+            		      disk_inode->length = disk_inode->length + count_len;
+            		      ASSERT (disk_inode->length == length);
+            		    }
+            		  else
+            		    {
+            		      disk_inode->length = disk_inode->length + BLOCK_SECTOR_SIZE;
+            		      count_len = count_len - BLOCK_SECTOR_SIZE;
+            		    }
+        		      i++;
+        		    }
             }
-	  else
-	    {
-	      // If created file does not have more sectors, no length count needed
-	      disk_inode->length = length;
-	    }
+          else
+            {
+              // If created file does not have more sectors, no length count needed
+      	      disk_inode->length = length;
+      	    }
           success = true; 
         } 
       free (disk_inode);
@@ -368,39 +410,25 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       // File growth; Desired sector not allocated yet
       while (sector_idx == -1)
-	{
-	  block_sector_t alloc_sector;
-	  static char zeros[BLOCK_SECTOR_SIZE];
+      	{
+      	  block_sector_t alloc_sector;
+      	  static char zeros[BLOCK_SECTOR_SIZE];
 
-	  if (boundary_sectors (inode, BLOCK_SECTOR_SIZE) == -1)
-	    // exit on failure
-	    return bytes_written;
+      	  if (boundary_sectors (inode, BLOCK_SECTOR_SIZE) == -1)
+      	    // exit on failure
+      	    return bytes_written;
 
-	  if ((alloc_sector = extend_by_one (inode)) == -1)
-	    return bytes_written;
+      	  if ((alloc_sector = extend_by_one (inode)) == -1)
+      	    return bytes_written;
 
-	  // Zero out new block sector
-	  // TODO: How to prevent user from seeing non-user written zeroes
-	  block_write (fs_device, alloc_sector, zeros);
+      	  // Zero out new block sector
+      	  // TODO: How to prevent user from seeing non-user written zeroes
+      	  block_write (fs_device, alloc_sector, zeros);
 
-	  // If allocated sector contains offset, returns valid sector #;
-	  // Otherwise, loop until valid number granted.
-	  sector_idx = byte_to_sector (inode, offset);
-	  /*
-	  if (sector_idx == -1)
-	  // Allocate indirect pointer blocks as needed
-	  if (!boundary_check (disk_inode, BLOCK_SECTOR_SIZE))
-	    // exit on failure
-	    return bytes_written;
-
-	  // Obtain free space and assign it to sector_idx
-	  sector_idx = extend_by_one (disk_inode, BLOCK_SECTOR_SIZE);
-	  ASSERT (byte_to_sector (inode, offset) == sector_idx);
-	  // If failed, exit
-	  if (sector_idx == -1)
-	    return bytes_written;
-	  */
-	}
+      	  // If allocated sector contains offset, returns valid sector #;
+      	  // Otherwise, loop until valid number granted.
+      	  sector_idx = byte_to_sector (inode, offset);
+      	}
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       // With file extension allowed, bytes left in inode is not useful here
@@ -536,7 +564,7 @@ static block_sector_t
 extend_by_one (struct inode *inode)
 {
   block_sector_t alloc_sec;
-  off_t next_idx = inode->data.length / 512 + 1;
+  off_t next_idx = inode->data.length / 512;
   off_t direct = DIRECTNUM + 1;
   off_t indirect = direct + 128;
 
@@ -565,7 +593,6 @@ extend_by_one (struct inode *inode)
       // Write to inner indirection block; same Q as above.
       block_write (fs_device, dbl_inn_idx, alloc_sec);
     }
-
   return alloc_sec; 
 }
 
