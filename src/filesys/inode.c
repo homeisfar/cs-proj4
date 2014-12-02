@@ -46,7 +46,7 @@ struct inode
 
 off_t boundary_sectors (struct inode_disk *, off_t);
 static block_sector_t extend_by_one (struct inode_disk *);
-void release_sectors (struct inode_disk *);
+void release_sectors (struct inode *);
 
 /* Returns the block device sector that contains byte offset POS
    within INODE.
@@ -55,6 +55,8 @@ void release_sectors (struct inode_disk *);
 static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos)
 {
+//return -1;
+
   ASSERT (inode != NULL);
   off_t indirect_size = 128;
 
@@ -117,6 +119,8 @@ inode_init (void)
 bool
 inode_create (block_sector_t sector, off_t length)
 {
+        // return false;
+
   struct inode_disk *disk_inode = NULL;
   bool success = false;
 
@@ -168,11 +172,8 @@ inode_create (block_sector_t sector, off_t length)
             }
           success = true; 
         }
-      //PANIC("disk %i, sector %i \n", disk_inode->direct[0], inode_open(sector)->data.direct[0]);
       free (disk_inode);
     }
-  // debug_backtrace();
-  PANIC("Well %i", sector);
   return success;
 }
 
@@ -243,11 +244,11 @@ inode_close (struct inode *inode)
     {
       /* Remove from inode list and release lock. */
       list_remove (&inode->elem);
- 
+
       /* Deallocate blocks if removed. */
       if (inode->removed) 
         {
-          release_sectors (&inode->data);
+          release_sectors (inode);
           free_map_release (inode->sector, 1);
           // free_map_release (inode->data.start,
           //                   bytes_to_sectors (inode->data.length)); 
@@ -361,6 +362,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       	  // Zero out new block sector
       	  // TODO: How to prevent user from seeing non-user written zeroes
       	  block_write (fs_device, alloc_sector, zeros);
+          inode->data.length = inode->data.length + 512;
 
       	  // If allocated sector contains offset, returns valid sector #;
       	  // Otherwise, loop until valid number granted.
@@ -546,25 +548,32 @@ extend_by_one (struct inode_disk *inode)
 }
 
 
-// No longer used in inode_create. May recode for inode_close
+// Used in inode_close to free space and write back to disk
 void
-release_sectors (struct inode_disk *inode)
+release_sectors (struct inode *inode)
 {
   block_sector_t dealloc = 0;
   off_t num_blocks = 0;
+
+  // Write back disk_inode struct
+  // This inherently includes all direct pointers
+  // Also includes the first indirect block sectors
+  block_write (fs_device, inode->sector, &inode->data);
   // Deallocate data blocks
   while (dealloc != -1)
     {
-      // How to get ending block sector?
-      // dealloc = byte_to_sector (inode, inode->length - 1);
-      inode->length = inode->length - BLOCK_SECTOR_SIZE;
+      dealloc = byte_to_sector (inode, inode->data.length - 1);
+      inode->data.length = inode->data.length - BLOCK_SECTOR_SIZE;
       free_map_release (dealloc, 1);
       num_blocks++;
     }
+  PANIC ("number %i", num_blocks);
 
   // Deallocate indirect pointer blocks
   if (num_blocks >= DIRECTNUM + 1)
-    free_map_release (inode->indirect, 1);
+    {
+      free_map_release (inode->data.indirect, 1);
+    }
   // Deallocate doubly indirect pointer blocks
   if (num_blocks >= DIRECTNUM + 129)
     {
@@ -572,12 +581,12 @@ release_sectors (struct inode_disk *inode)
       off_t indir = (num_blocks - (DIRECTNUM + 129)) / 128;
       block_sector_t dbl_indir[128];
       while (indir >= 0)
-	{
-	  block_read (fs_device, inode->d_indirect, &dbl_indir);
-	  free_map_release (dbl_indir[indir], 1);
-	  indir--;
-	}
-      free_map_release (inode->d_indirect, 1);
+      	{
+      	  block_read (fs_device, inode->data.d_indirect, dbl_indir);
+      	  free_map_release (dbl_indir[indir], 1);
+      	  indir--;
+      	}
+      free_map_release (inode->data.d_indirect, 1);
     }
   return;
 }
