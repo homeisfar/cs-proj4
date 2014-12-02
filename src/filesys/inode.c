@@ -40,8 +40,8 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
-    struct block_sector_t *indirect;
-    struct block_sector_t **d_indirect;
+    // block_sector_t *indirect;
+    // block_sector_t **d_indirect;
   };
 
 off_t boundary_sectors (struct inode_disk *, off_t);
@@ -164,13 +164,15 @@ inode_create (block_sector_t sector, off_t length)
                   block_write (fs_device, alloc_sector, zeros);
         		      i++;
         		    }
+              block_write (fs_device, sector, disk_inode); 
             }
           success = true; 
-        } 
-        printf ("disk %i, sector %i \n", disk_inode->direct[0], inode_open(sector)->data.direct[0]);
+        }
+      //PANIC("disk %i, sector %i \n", disk_inode->direct[0], inode_open(sector)->data.direct[0]);
       free (disk_inode);
     }
-  // printf("Well %i, sector %i \n", inode_open(sector)->data.start, sector);
+  // debug_backtrace();
+  PANIC("Well %i", sector);
   return success;
 }
 
@@ -447,6 +449,7 @@ inode_length (const struct inode *inode)
 int
 boundary_sectors (struct inode_disk *inode, off_t size)
 {
+  // struct inode_disk *inode = 
   off_t direct_pointers = DIRECTNUM;  // inode->data.start included
   off_t in_direct_ptrs = direct_pointers + 128;
   off_t doubly_indirect = 128;
@@ -467,6 +470,9 @@ boundary_sectors (struct inode_disk *inode, off_t size)
   // Add two block sectors if entering doubly indirect pointers
   else if (cur_alloc < in_direct_ptrs && fut_alloc >= in_direct_ptrs)
     {
+      // Allocate buffer to write second sector number into
+      block_sector_t d_indirect_buf[128] = {0};
+
       block_sector_t first_indirect;
       block_sector_t second_indirect;
       if (!free_map_count (2) || !free_map_allocate (1, &first_indirect)
@@ -474,19 +480,24 @@ boundary_sectors (struct inode_disk *inode, off_t size)
       	return -1;
       // Assign first indirection block to inode
       inode->d_indirect = first_indirect;
+      d_indirect_buf[0] = second_indirect;
       // Write location of second indirection block into first block
-      block_write (fs_device, inode->d_indirect, second_indirect);
+      block_write (fs_device, inode->d_indirect, d_indirect_buf[128]);
     }
   // Add doubly indirect block; Write # to first indirection block
   else if (cur_alloc > in_direct_ptrs && 
 	   ((fut_alloc - in_direct_ptrs) % doubly_indirect == 0))
     {
-      block_sector_t second_indirect[128];
-      //off_t dbl_idx = (fut_alloc - in_direct_ptrs) / 128;
+      block_sector_t second_indirect;
       if (!free_map_count (1) || !free_map_allocate (1, &second_indirect))
-	      return -1;
+        return -1;
+      /* We need a bounce buffer to hold data already in sector. */
+      block_sector_t bounce[128] = {0};
+      block_read (fs_device, inode->d_indirect, bounce);
+      off_t dbl_idx = (fut_alloc - in_direct_ptrs) / doubly_indirect;
       // Write location of new doubly indirect block into first block
-      block_write (fs_device, inode->d_indirect, second_indirect);
+      bounce[dbl_idx] = second_indirect;
+      block_write (fs_device, inode->d_indirect, bounce);
     }
   return 0;
 }
@@ -499,7 +510,7 @@ static block_sector_t
 extend_by_one (struct inode_disk *inode)
 {
   block_sector_t alloc_sec;
-  off_t next_idx = inode->length / 512; // minus 1 to account for .start
+  off_t next_idx = inode->length / 512 - 1; // minus 1 to account for .start
   off_t direct = DIRECTNUM;
   off_t indirect = direct + 128;
 
@@ -511,22 +522,25 @@ extend_by_one (struct inode_disk *inode)
     inode->direct[next_idx] = alloc_sec;
   else if (next_idx < indirect)
     {
-      // Does block_write automatically write at the end of
-      // allocated space?
-      block_write (fs_device, inode->indirect, alloc_sec);
+      block_sector_t bounce[128] = {0};
+      block_read (fs_device, inode->indirect, bounce);
+      // Write location of new doubly indirect block into first block
+      bounce[next_idx - direct] = alloc_sec;
+      block_write (fs_device, inode->indirect, bounce);
     }
   else
     {      
-      block_sector_t dbl_out_idx[128];
-      block_sector_t dbl_inn_idx[128];
-      off_t dbl_index = (next_idx - indirect) / 128;
-      //off_t double_indirect = (next_idx - indirect) % 128;
+      block_sector_t dbl_out_idx[128] = {0};
+      block_sector_t dbl_inn_idx[128] = {0};
+      off_t outer_index = (next_idx - indirect) / 128;
+      off_t inner_indirect = (next_idx - indirect) % 128;
 
       // Get inner indirection block sector #
-      block_read (fs_device, inode->d_indirect, &dbl_out_idx);
-      block_read (fs_device, dbl_out_idx[dbl_index], &dbl_inn_idx);
-      // Write to inner indirection block; same Q as above.
-      block_write (fs_device, dbl_inn_idx, alloc_sec);
+      block_read (fs_device, inode->d_indirect, dbl_out_idx);
+      block_read (fs_device, dbl_out_idx[outer_index], dbl_inn_idx);
+      // Write to inner indirection block
+      dbl_inn_idx[inner_indirect] = alloc_sec;
+      block_write (fs_device, dbl_out_idx[outer_index], dbl_inn_idx);
     }
   return alloc_sec; 
 }
