@@ -352,7 +352,9 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       	  if (boundary_sectors (&inode->data, BLOCK_SECTOR_SIZE) == -1)
       	    return bytes_written;
 
-      	  if ((alloc_sector = extend_by_one (&inode->data)) == -1)
+          alloc_sector = extend_by_one (&inode->data);
+
+      	  if (alloc_sector == -1)
       	    return bytes_written;
 
       	  // Zero out new block sector
@@ -363,7 +365,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       	  // Otherwise, loop until valid number granted.
       	  sector_idx = byte_to_sector (inode, offset);
       	}
-
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       // With file extension allowed, bytes left in inode is not useful here
       //off_t inode_left = inode_length (inode) - offset;
@@ -408,7 +409,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     }
   free (bounce);
   
-  inode->data.length = offset + size;
+  off_t final_len = (inode->data.length) > (offset + size) ? (inode->data.length) : (offset + size);
+  inode->data.length = final_len;
   block_write (fs_device, inode->sector, &inode->data);
 
   return bytes_written;
@@ -452,8 +454,8 @@ boundary_sectors (struct inode_disk *inode, off_t size)
   off_t direct_pointers = DIRECTNUM;  // inode->data.start included
   off_t in_direct_ptrs = direct_pointers + 128;
   off_t doubly_indirect = 128;
-  off_t cur_alloc = inode->length / BLOCK_SECTOR_SIZE;
-  off_t fut_alloc = (inode->length + size) / BLOCK_SECTOR_SIZE;
+  off_t cur_alloc = inode->length / BLOCK_SECTOR_SIZE - 1;
+  off_t fut_alloc = (inode->length + size) / BLOCK_SECTOR_SIZE - 1;
 
   // If no new block needs to be allocated for pointers, exit
   if (fut_alloc - cur_alloc == 0)
@@ -481,7 +483,7 @@ boundary_sectors (struct inode_disk *inode, off_t size)
       inode->d_indirect = first_indirect;
       d_indirect_buf[0] = second_indirect;
       // Write location of second indirection block into first block
-      block_write (fs_device, inode->d_indirect, d_indirect_buf[128]);
+      block_write (fs_device, inode->d_indirect, d_indirect_buf);
     }
   // Add doubly indirect block; Write # to first indirection block
   else if (cur_alloc > in_direct_ptrs && 
@@ -502,9 +504,8 @@ boundary_sectors (struct inode_disk *inode, off_t size)
 }
 
 /* Returns a single allocated block sector number if successful; returns 
-   -1 on failure. Currently does not consider cases where there is space
-   remaining in an already-allocated inode. Does not increase recorded inode
-   length. Excludes cases covered by boundary_sector. */
+   -1 on failure. Does not consider cases where there is space remaining 
+   in an already-allocated inode. Excludes cases covered by boundary_sector. */
 static block_sector_t
 extend_by_one (struct inode_disk *inode)
 {
@@ -518,7 +519,9 @@ extend_by_one (struct inode_disk *inode)
     return -1;
 
   if (next_idx < direct)
-    inode->direct[next_idx] = alloc_sec;
+    {
+      inode->direct[next_idx] = alloc_sec;
+    }
   else if (next_idx < indirect)
     {
       block_sector_t bounce[128] = {0};
@@ -550,22 +553,22 @@ extend_by_one (struct inode_disk *inode)
 void
 release_sectors (struct inode *inode)
 {
-  block_sector_t dealloc = 0;
+  block_sector_t dealloc = byte_to_sector (inode, inode->data.length - 1);
   off_t num_blocks = 0;
 
   // Write back disk_inode struct
-  // This inherently includes all direct pointers
-  // Also includes the first indirect block sectors
   block_write (fs_device, inode->sector, &inode->data);
   // Deallocate data blocks
+  // PANIC("dealloc %i", dealloc);
   while (dealloc != -1)
     {
-      dealloc = byte_to_sector (inode, inode->data.length - 1);
-      inode->data.length -= BLOCK_SECTOR_SIZE;
       free_map_release (dealloc, 1);
+      inode->data.length -= BLOCK_SECTOR_SIZE;
+      dealloc = byte_to_sector (inode, inode->data.length - 1);
+
       num_blocks++;
     }
-
+PANIC ("NUM BLOCKS %i", num_blocks);
   // Deallocate indirect pointer blocks
   if (num_blocks >= DIRECTNUM + 1)
     {
@@ -585,7 +588,7 @@ release_sectors (struct inode *inode)
       	}
       free_map_release (inode->data.d_indirect, 1);
     }
-  free_map_release (inode->data.start, 1);
+  // free_map_release (inode->data.start, 1);
   return;
 }
 
