@@ -558,17 +558,18 @@ release_sectors (struct inode *inode)
 
   // Write back disk_inode struct
   block_write (fs_device, inode->sector, &inode->data);
+
   // Deallocate data blocks
-  // PANIC("dealloc %i", dealloc);
-  while (dealloc != -1)
+  free_map_release (dealloc, 1);
+  inode->data.length -= inode->data.length % BLOCK_SECTOR_SIZE;
+
+  while (inode->data.length > 0)
     {
+      dealloc = byte_to_sector (inode, inode->data.length - 1);
       free_map_release (dealloc, 1);
       inode->data.length -= BLOCK_SECTOR_SIZE;
-      dealloc = byte_to_sector (inode, inode->data.length - 1);
-
       num_blocks++;
     }
-PANIC ("NUM BLOCKS %i", num_blocks);
   // Deallocate indirect pointer blocks
   if (num_blocks >= DIRECTNUM + 1)
     {
@@ -588,7 +589,6 @@ PANIC ("NUM BLOCKS %i", num_blocks);
       	}
       free_map_release (inode->data.d_indirect, 1);
     }
-  // free_map_release (inode->data.start, 1);
   return;
 }
 
