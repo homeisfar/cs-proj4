@@ -101,3 +101,22 @@ do_format (void)
   free_map_close ();
   printf ("done.\n");
 }
+
+/* Navigates file hierarchy to get to correct file/dir */
+struct file *
+filesys_pathfinder (char *name)
+{
+  strtok_r (char *s, const char *delimiters, char **save_ptr) 
+
+  // Keep string 'head' that tracks latest string?
+
+  if (name[0] == '/')
+    {
+      // Absolute path
+    }
+  else 
+    {
+      // Relative path
+    }
+}
+

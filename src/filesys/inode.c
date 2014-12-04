@@ -9,7 +9,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define DIRECTNUM 123
+#define DIRECTNUM 122
 
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
@@ -18,9 +18,10 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    block_sector_t direct[DIRECTNUM];         
-    block_sector_t indirect;
-    block_sector_t d_indirect;
+    bool isdir;                         /* Is a directory or not */
+    block_sector_t direct[DIRECTNUM];   /* Direct pointer array */      
+    block_sector_t indirect;            /* Indirect pointer block */
+    block_sector_t d_indirect;          /* First block for doubly indirect ptrs */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -40,8 +41,6 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
-    // block_sector_t *indirect;
-    // block_sector_t **d_indirect;
   };
 
 off_t boundary_sectors (struct inode_disk *, off_t);
