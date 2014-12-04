@@ -28,6 +28,11 @@ static int sys_write (int, const void *, uint32_t);
 static void sys_seek (int, uint32_t);
 static uint32_t sys_tell (int);
 static void sys_close (int);
+static bool sys_chdir (const char *);
+static bool sys_mkdir (const char *);
+static bool sys_readdir (int, char *);
+static bool sys_isdir (int);
+static int sys_inumber (int);
 static void valid_ptr (const void*);
 static int valid_index (int);
 
@@ -47,7 +52,7 @@ void
 valid_ptr (const void *usrdata)
 {
 	if (!(usrdata && is_user_vaddr (usrdata) &&
-  pagedir_get_page (thread_current()->pagedir, usrdata)))
+  pagedir_get_page (thread_current ()->pagedir, usrdata)))
     sys_exit (-1);
 }
 
@@ -74,132 +79,192 @@ syscall_handler (struct intr_frame *f UNUSED)
   f->esp = pop (f->esp, (void *) &sys_call_num, sizeof (int));
   valid_ptr (f->esp);
 
-  switch (sys_call_num){
-    case SYS_HALT:{ // 0 args
-      shutdown_power_off ();
-      break;
-    }
+  switch (sys_call_num)
+  {
+    case SYS_HALT:
+      {
+        shutdown_power_off ();
+        break;
+      }
 
-    case SYS_EXIT:{ // 1 arg
-      int arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
-      valid_ptr (f->esp);
-      sys_exit (arg0);
-      break;
-    }
+    case SYS_EXIT:
+      { 
+        int arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        sys_exit (arg0);
+        break;
+      }
 
-    case SYS_EXEC:{ // 1 arg
-      char *arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
-      valid_ptr (f->esp);
-      valid_ptr (arg0);
-      f->eax = sys_exec (arg0);
-      break;
-    }
+    case SYS_EXEC:
+      {
+        char *arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
+        valid_ptr (f->esp);
+        valid_ptr (arg0);
+        f->eax = sys_exec (arg0);
+        break;
+      }
 
-    case SYS_WAIT:{ // 1 arg
-      pid_t arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (pid_t));
-      valid_ptr (f->esp);
-      f->eax = sys_wait (arg0);
-      break;
-    }
+    case SYS_WAIT:
+      { 
+        pid_t arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (pid_t));
+        valid_ptr (f->esp);
+        f->eax = sys_wait (arg0);
+        break;
+      }
 
-    case SYS_CREATE:{ // 2 args
-      char *arg0;
-      uint32_t arg1;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
-      valid_ptr (f->esp);
-      f->esp = pop (f->esp, (void *) &arg1, sizeof (uint32_t));
-      valid_ptr (f->esp);
-      valid_ptr (arg0);
-      f->eax = sys_create (arg0, arg1);
-      break;
-    }
+    case SYS_CREATE:
+      {
+        char *arg0;
+        uint32_t arg1;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
+        valid_ptr (f->esp);
+        f->esp = pop (f->esp, (void *) &arg1, sizeof (uint32_t));
+        valid_ptr (f->esp);
+        valid_ptr (arg0);
+        f->eax = sys_create (arg0, arg1);
+        break;
+      }
 
-    case SYS_REMOVE:{ // 1 arg
-      char *arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
-      valid_ptr (f->esp);
-      valid_ptr (arg0);
-      f->eax = sys_remove (arg0);
-      break;
-    }
+    case SYS_REMOVE:
+      {
+        char *arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
+        valid_ptr (f->esp);
+        valid_ptr (arg0);
+        f->eax = sys_remove (arg0);
+        break;
+      }
 
-    case SYS_OPEN:{ // 1 arg
-      char *arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
-      valid_ptr (f->esp);
-      valid_ptr (arg0);
-      f->eax = sys_open (arg0);
+    case SYS_OPEN:
+      { 
+        char *arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (char *));
+        valid_ptr (f->esp);
+        valid_ptr (arg0);
+        f->eax = sys_open (arg0);
+        break;
+      }
 
-      break;
-    }
+    case SYS_FILESIZE:
+      { 
+        int arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->eax = sys_filesize (arg0);
+        break;
+      }
 
-    case SYS_FILESIZE:{ // 1 arg
-      int arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
-      valid_ptr (f->esp);
-      f->eax = sys_filesize (arg0);
-      break;
-    }
+    case SYS_READ:
+      {
+        int arg0;
+        void *arg1;
+        uint32_t arg2;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->esp = pop (f->esp, (void *) &arg1, sizeof (void *));
+        valid_ptr (f->esp);
+        f->esp = pop (f->esp, (void *) &arg2, sizeof (uint32_t));
+        valid_ptr (f->esp);
+        valid_ptr (arg1);
+        f->eax = sys_read (arg0, arg1, arg2);
+        break;
+      }
 
-    case SYS_READ:{ // 3 args
-      int arg0;
-      void *arg1;
-      uint32_t arg2;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
-      valid_ptr (f->esp);
-      f->esp = pop (f->esp, (void *) &arg1, sizeof (void *));
-      valid_ptr (f->esp);
-      f->esp = pop (f->esp, (void *) &arg2, sizeof (uint32_t));
-      valid_ptr (f->esp);
-      valid_ptr (arg1);
-      f->eax = sys_read (arg0, arg1, arg2);
-      break;
-    }
+    case SYS_WRITE:
+      {
+        int arg0;
+        void *arg1;
+        uint32_t arg2;
+        f->esp = pop (f->esp, (void *)&arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->esp = pop (f->esp, (void *)&arg1, sizeof (void *));
+        valid_ptr (f->esp);
+        f->esp = pop (f->esp, (void *)&arg2, sizeof (uint32_t));
+        valid_ptr (f->esp);
+        valid_ptr (arg1);
+        f->eax = sys_write (arg0, arg1, arg2);
+        break;
+      }
 
-    case SYS_WRITE:{ // 3 args
-      int arg0;
-      void *arg1;
-      uint32_t arg2;
-      f->esp = pop (f->esp, (void *)&arg0, sizeof (int));
-      valid_ptr (f->esp);
-      f->esp = pop (f->esp, (void *)&arg1, sizeof (void *));
-      valid_ptr (f->esp);
-      f->esp = pop (f->esp, (void *)&arg2, sizeof (uint32_t));
-      valid_ptr (f->esp);
-      valid_ptr (arg1);
-      f->eax = sys_write (arg0, arg1, arg2);
-      break;
-    }
+    case SYS_SEEK:
+      {
+        int arg0;
+        uint32_t arg1;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->esp = pop (f->esp, (void *) &arg1, sizeof (uint32_t));
+        valid_ptr (f->esp);
+        sys_seek (arg0, arg1);
+        break;
+      }
 
-    case SYS_SEEK:{ // 2 args
-      int arg0;
-      uint32_t arg1;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
-      valid_ptr (f->esp);
-      f->esp = pop (f->esp, (void *) &arg1, sizeof (uint32_t));
-      valid_ptr (f->esp);
-      sys_seek (arg0, arg1);
-      break;
-    }
+    case SYS_TELL:
+      { 
+        int arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->eax = sys_tell (arg0);
+        break;
+      }
 
-    case SYS_TELL:{ // 1 arg
-      int arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
-      valid_ptr (f->esp);
-      f->eax = sys_tell (arg0);
-      break;
-    }
+    case SYS_CLOSE:
+      {
+        int arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        sys_close (arg0);
+        break;
+      }
 
-    case SYS_CLOSE:{ // 1 arg
-      int arg0;
-      f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
-      valid_ptr (f->esp);
-      sys_close (arg0);
-      break;
-    }
+    case SYS_CHDIR: // 1 arg
+      {
+        const char *arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->eax = sys_chdir (arg0);
+        break;
+      }
+
+    case SYS_MKDIR: // 1 arg
+      {
+        const char *arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->eax = sys_mkdir (arg0);
+        break;
+      }
+
+    case SYS_READDIR: // 2 args
+      {
+        int arg0;
+        char *arg1;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->esp = pop (f->esp, (void *) &arg1, sizeof (uint32_t));
+        valid_ptr (f->esp);
+        f->eax = sys_readdir (arg0, arg1);
+      }
+
+    case SYS_ISDIR: // 1 arg
+      {
+        int arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->eax = sys_isdir (arg0);
+        break;
+      }
+
+    case SYS_INUMBER: // 1 arg
+      {
+        int arg0;
+        f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
+        valid_ptr (f->esp);
+        f->eax = sys_inumber (arg0);
+        break;
+      }
   }
   f->esp = default_esp;
 }
@@ -227,7 +292,7 @@ sys_exit (int status)
   char output[32];
   int num_bytes = snprintf (output, 32, "%s: exit(%d)\n",
     t->name, t->exit_status);
-  putbuf(output, num_bytes);
+  putbuf (output, num_bytes);
   file_close (t->self_executable);
   lock_release (&fs_lock);
   thread_exit ();
@@ -287,16 +352,16 @@ sys_open (const char *file)
   struct file *f;
   struct thread *t;
   int i;
-  t = thread_current();
+  t = thread_current ();
 
-  if(t->fd_size >= FDMAX)
+  if (t->fd_size >= FDMAX)
     return -1;
 
-  f = open_helper(file);
+  f = open_helper (file);
   if (!f)
     return -1;
 
-  for(i = 0; i < FDMAX && t->fds[i]; i++);
+  for (i = 0; i < FDMAX && t->fds[i]; i++);
   t->fds[i] = f;
   t->fd_size++;
   return i+2;
@@ -308,7 +373,7 @@ open_helper (const char *name)
 {
   struct file *f;
   lock_acquire (&fs_lock);
-  f= filesys_open (name);
+  f = filesys_open (name);
   lock_release (&fs_lock);
   return f;
 }
@@ -532,6 +597,95 @@ close_helper (struct file *file)
   lock_release (&fs_lock);
 }
 
+/* Change the current directory. */
+bool
+sys_chdir (const char *dir)
+{
+  // lookup new dir
+  if (!dir_reopen (dir))
+    return false; 
+  // close old dir and open new one (?)
+  struct thread *t = thread_current ();
+  struct dir *old_dir = t->cur_dir;
+  if (!dir_close (old_dir))
+    return false;
+  t->cur_dir = dir;
+  return true;
+}
+
+/* Create a directory. */
+bool
+sys_mkdir (const char *dir)
+{
+  dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
+  // return true;
+}
+
+/* Reads a directory entry. */
+bool
+sys_readdir (int fd, char *name)
+{
+  struct thread *t;
+  struct file *f;
+  t = thread_current ();
+  fd = valid_index (fd);
+  if (fd < 0)
+    {
+      sys_exit (-1);
+      return -1;  // gets rid of warning
+    }
+  f = t->fds[fd];
+  if (f && file_isdir (f))
+    {
+      dir_readdir (struct dir *dir, char name[NAME_MAX + 1]);
+    }
+  sys_exit (-1);
+  return false;
+}
+
+/* Tests if a fd represents a directory. */
+bool
+sys_isdir (int fd)
+{
+  struct thread *t;
+  struct file *f;
+  t = thread_current ();
+  fd = valid_index (fd);
+  if (fd < 0)
+    {
+      sys_exit (-1);
+      return -1;  // gets rid of warning
+    }
+  f = t->fds[fd];
+  if (f)
+    return file_isdir (f);
+  sys_exit (-1);
+  return false;  // gets rid of warning
+}
+
+/* Returns the inode number for a fd. */
+int
+sys_inumber (int fd)
+{
+  struct thread *t;
+  struct file *f;
+  t = thread_current ();
+  fd = valid_index (fd);
+  if (fd < 0)
+    {
+      sys_exit (-1);
+      return -1;  // gets rid of warning
+    }
+  f = t->fds[fd];
+  if (f)
+    {
+      struct inode *ino = file_get_inode (f);
+      //return ino->sector;
+    }
+  sys_exit (-1);
+  return -1;  // gets rid of warning
+}
+
 /* Valid_index is a helper function designed to
    match the file descriptor to its index in the
    FDT. This is necessary because fd = 0, 1 are
@@ -540,7 +694,7 @@ int
 valid_index (int fd)
 {
   fd -= 2;
-  if( fd < FDMAX && fd >= 0 )
+  if ( fd < FDMAX && fd >= 0 )
     return fd;
   else
     return -1;
