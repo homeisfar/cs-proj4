@@ -83,3 +83,9 @@ free_map_create (void)
   if (!bitmap_write (free_map, free_map_file))
     PANIC ("can't write free map");
 }
+
+bool
+free_map_count (off_t length)
+{
+  return (bitmap_count (free_map, 0, bitmap_size (free_map), false) >= length);
+}
