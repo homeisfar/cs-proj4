@@ -9,7 +9,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define DIRECTNUM 123
+#define DIRECTNUM 122
 
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
@@ -18,6 +18,7 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
+    bool dir;                           /* Tells us if this is a dir */
     block_sector_t direct[DIRECTNUM];         
     block_sector_t indirect;
     block_sector_t d_indirect;
@@ -40,6 +41,7 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
+    bool dir;
     // block_sector_t *indirect;
     // block_sector_t **d_indirect;
   };
@@ -115,7 +117,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -135,6 +137,7 @@ inode_create (block_sector_t sector, off_t length)
     {
       disk_inode->length = 0;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->dir = dir;
 
       if (free_map_allocate (1, &disk_inode->start)) 
         {
@@ -206,6 +209,7 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  inode->dir = &inode->data.dir;
   block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
@@ -592,3 +596,8 @@ release_sectors (struct inode *inode)
   return;
 }
 
+bool
+inode_is_dir (struct inode *inode)
+{
+  return inode->dir;
+}

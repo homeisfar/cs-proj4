@@ -149,10 +149,11 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-    /* File Struct for File Descriptors */
+    /* File Struct for File Descriptors & Directories */
     struct file *fds[FDMAX];
     struct file *self_executable;
     uint32_t fd_size;
+    struct dir *dir;
     
     /* Parent thread */
     struct thread *parent;
