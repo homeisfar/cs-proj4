@@ -5,6 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir 
@@ -26,12 +27,16 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
+  /* inode is created at sector
+   * therefore we need to block_read to get the first data sector,
+   * and pass that into
+   */
   bool ret_val= inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
   if (ret_val)
   {
     struct inode *i = inode_open (sector);
     struct dir *d = dir_open (i);
-    filesys_create (".", sizeof (dir)); //NOT SURE IF DIR OR DIR_ENTRY
+    filesys_create (".", sizeof (d)); //NOT SURE IF DIR OR DIR_ENTRY
     
     // dir_add (d, ".", sector); //incomplete b/c "." isn't a file yet.
     inode_close (i);
@@ -66,6 +71,12 @@ struct dir *
 dir_open_root (void)
 {
   return dir_open (inode_open (ROOT_DIR_SECTOR));
+}
+
+struct dir *
+dir_open_current (void)
+{
+    return thread_current ()->dir;
 }
 
 /* Opens and returns a new directory for the same inode as DIR.
@@ -174,6 +185,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
      inode_read_at() will only return a short read at end of file.
      Otherwise, we'd need to verify that we didn't get a short
      read due to something intermittent such as low memory. */
+
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) 
     if (!e.in_use)
