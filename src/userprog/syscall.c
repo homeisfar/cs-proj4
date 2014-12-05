@@ -218,8 +218,8 @@ syscall_handler (struct intr_frame *f UNUSED)
         sys_close (arg0);
         break;
       }
-/*
-    case SYS_CHDIR: // 1 arg
+
+    case SYS_CHDIR: 
       {
         const char *arg0;
         f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
@@ -228,7 +228,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
       }
 
-    case SYS_MKDIR: // 1 arg
+    case SYS_MKDIR: 
       {
         const char *arg0;
         f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
@@ -237,7 +237,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
       }
 
-    case SYS_READDIR: // 2 args
+    case SYS_READDIR:
       {
         int arg0;
         char *arg1;
@@ -248,7 +248,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         f->eax = sys_readdir (arg0, arg1);
       }
 
-    case SYS_ISDIR: // 1 arg
+    case SYS_ISDIR: 
       {
         int arg0;
         f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
@@ -257,7 +257,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
       }
 
-    case SYS_INUMBER: // 1 arg
+    case SYS_INUMBER: 
       {
         int arg0;
         f->esp = pop (f->esp, (void *) &arg0, sizeof (int));
@@ -265,7 +265,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         f->eax = sys_inumber (arg0);
         break;
       }
-*/
   }
   f->esp = default_esp;
 }
@@ -482,6 +481,8 @@ sys_write (int fd, const void *buffer, uint32_t size)
     f = t->fds[fd];
     if (f)
     {
+      // if (file_isdir (f))
+      //   return 0;
       bytes_out = write_helper (f, buffer, (off_t) size);
       return bytes_out;
     }
@@ -598,94 +599,94 @@ close_helper (struct file *file)
   lock_release (&fs_lock);
 }
 
-// /* Change the current directory. */
-// bool
-// sys_chdir (const char *dir)
-// {
-//   // lookup new dir
-//   if (!dir_reopen (dir))
-//     return false; 
-//   // close old dir and open new one (?)
-//   struct thread *t = thread_current ();
-//   struct dir *old_dir = t->cur_dir;
-//   if (!dir_close (old_dir))
-//     return false;
-//   t->cur_dir = dir;
-//   return true;
-// }
+/* Change the current directory. */
+bool
+sys_chdir (const char *dir)
+{
+  // lookup new dir
+  if (!dir_reopen (dir))
+    return false; 
+  // close old dir and open new one (?)
+  struct thread *t = thread_current ();
+  struct dir *old_dir = t->cur_dir;
+  if (!dir_close (old_dir))
+    return false;
+  t->cur_dir = dir;
+  return true;
+}
 
-// /* Create a directory. */
-// bool
-// sys_mkdir (const char *dir)
-// {
-//   dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
-//   // return true;
-// }
+/* Create a directory. */
+bool
+sys_mkdir (const char *dir)
+{
+  filesys_create;
+  // return true;
+}
 
-// /* Reads a directory entry. */
-// bool
-// sys_readdir (int fd, char *name)
-// {
-//   struct thread *t;
-//   struct file *f;
-//   t = thread_current ();
-//   fd = valid_index (fd);
-//   if (fd < 0)
-//     {
-//       sys_exit (-1);
-//       return -1;  // gets rid of warning
-//     }
-//   f = t->fds[fd];
-//   if (f && file_isdir (f))
-//     {
-//       dir_readdir (struct dir *dir, char name[NAME_MAX + 1]);
-//     }
-//   sys_exit (-1);
-//   return false;
-// }
+/* Reads a directory entry. */
+bool
+sys_readdir (int fd, char *name)
+{
+  struct thread *t;
+  struct file *f;
+  t = thread_current ();
+  fd = valid_index (fd);
+  if (fd < 0)
+    {
+      sys_exit (-1);
+      return -1;  // gets rid of warning
+    }
+  f = t->fds[fd];
+  if (f && file_isdir (f))
+    {
+      dir_readdir (struct dir *dir, char name[NAME_MAX + 1]);
+    }
+  sys_exit (-1);
+  return false;
+}
 
-// /* Tests if a fd represents a directory. */
-// bool
-// sys_isdir (int fd)
-// {
-//   struct thread *t;
-//   struct file *f;
-//   t = thread_current ();
-//   fd = valid_index (fd);
-//   if (fd < 0)
-//     {
-//       sys_exit (-1);
-//       return -1;  // gets rid of warning
-//     }
-//   f = t->fds[fd];
-//   if (f)
-//     return file_isdir (f);
-//   sys_exit (-1);
-//   return false;  // gets rid of warning
-// }
+/* Tests if a fd represents a directory. */
+bool
+sys_isdir (int fd)
+{
+  struct thread *t;
+  struct file *f;
+  t = thread_current ();
+  fd = valid_index (fd);
+  if (fd < 0)
+    {
+      sys_exit (-1);
+      return -1;  // gets rid of warning
+    }
+  f = t->fds[fd];
+  if (f)
+    return file_isdir (f);
+  sys_exit (-1);
+  return false;  // gets rid of warning
+}
 
-// /* Returns the inode number for a fd. */
-// int
-// sys_inumber (int fd)
-// {
-//   struct thread *t;
-//   struct file *f;
-//   t = thread_current ();
-//   fd = valid_index (fd);
-//   if (fd < 0)
-//     {
-//       sys_exit (-1);
-//       return -1;  // gets rid of warning
-//     }
-//   f = t->fds[fd];
-//   if (f)
-//     {
-//       struct inode *ino = file_get_inode (f);
-//       //return ino->sector;
-//     }
-//   sys_exit (-1);
-//   return -1;  // gets rid of warning
-// }
+/* Returns the inode number for a fd. */
+int
+sys_inumber (int fd)
+{
+  struct thread *t;
+  struct file *f;
+  t = thread_current ();
+  fd = valid_index (fd);
+  if (fd < 0)
+    {
+      sys_exit (-1);
+      return -1;  // gets rid of warning
+    }
+  f = t->fds[fd];
+  if (f)
+    {
+      struct inode *ino = file_get_inode (f);
+      //return ino->sector;
+    }
+  sys_exit (-1);
+  return -1;  // gets rid of warning
+}
 
 /* Valid_index is a helper function designed to
    match the file descriptor to its index in the
