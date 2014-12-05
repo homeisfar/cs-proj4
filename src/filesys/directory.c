@@ -65,8 +65,7 @@ dir_open (struct inode *inode)
     }
 }
 
-/* Opens the root directory and returns a directory for it.
-   Return true if successful, false on failure. */
+/* Opens the root directory and returns a directory for it. */
 struct dir *
 dir_open_root (void)
 {

@@ -172,6 +172,9 @@ struct thread
     int exit_status;
     int load_status;
 
+    /* Link to current directory */
+    struct dir *cur_dir;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 

@@ -529,7 +529,7 @@ setup_stack (void **esp, const char *file_name)
 
             // Decrement pointer to account for padding and
             // for the size of the next pointer in the stack frame
-            *esp -= (PADDING(len));
+            *esp -= (PADDING (len));
             char *token, *save_ptr;
 
             // tokenize fn_copy

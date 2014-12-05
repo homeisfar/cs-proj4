@@ -18,10 +18,10 @@ struct inode_disk
     block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    bool dir;                           /* Tells us if this is a dir */
-    block_sector_t direct[DIRECTNUM];         
-    block_sector_t indirect;
-    block_sector_t d_indirect;
+    bool isdir;                         /* Is a directory or not */
+    block_sector_t direct[DIRECTNUM];   /* Direct pointer array */      
+    block_sector_t indirect;            /* Indirect pointer block */
+    block_sector_t d_indirect;          /* First block for doubly indirect ptrs */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -137,7 +137,7 @@ inode_create (block_sector_t sector, off_t length, bool dir)
     {
       disk_inode->length = 0;
       disk_inode->magic = INODE_MAGIC;
-      disk_inode->dir = dir;
+      disk_inode->isdir = dir;
 
       if (free_map_allocate (1, &disk_inode->start)) 
         {
@@ -209,7 +209,7 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
-  inode->dir = &inode->data.dir;
+  inode->dir = &inode->data.isdir;
   block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
