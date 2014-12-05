@@ -639,7 +639,7 @@ sys_readdir (int fd, char *name)
   f = t->fds[fd];
   if (f && file_isdir (f))
     {
-      dir_readdir (struct dir *dir, char name[NAME_MAX + 1]);
+      //dir_readdir (struct dir *dir, char name[NAME_MAX + 1]);
     }
   sys_exit (-1);
   return false;

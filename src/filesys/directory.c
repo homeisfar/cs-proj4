@@ -24,7 +24,7 @@ struct dir_entry
 
 
 bool
-dir_create_link (const char *parent_dir, const char *new_dir, byte_sector_t sector) 
+dir_create_link (const char *parent_dir, const char *new_dir, block_sector_t sector) 
 {
   char *filename = calloc (strlen (parent_dir) + 1, sizeof (char));
   struct dir *dir = filesys_pathfinder (parent_dir, filename);
@@ -42,7 +42,7 @@ dir_create_link (const char *parent_dir, const char *new_dir, byte_sector_t sect
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (const char* name, block_sector_t sector, size_t entry_cnt)
+dir_create (block_sector_t sector, size_t entry_cnt)
 {
   /* inode is created at sector
    * therefore we need to block_read to get the first data sector,
@@ -52,23 +52,31 @@ dir_create (const char* name, block_sector_t sector, size_t entry_cnt)
   bool ret_val = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
   struct dir *d = t->cur_dir ? t->cur_dir : dir_open_root();
   /* Add a new dir entry in the current dir for the new dir */
-  dir_add(d, name, sector);
+  //dir_add(d, name, sector);
   if (ret_val)
   {
-    //struct inode *i = inode_open (sector);
-    //struct dir *d = dir_open (i);
-    //filesys_create (".", sizeof (d)); //NOT SURE IF DIR OR DIR_ENTRY
-
+    struct inode *inode = inode_open(sector);
+    struct dir *new_dir = dir_open(inode);
     /* Add a new dir entry called "." in the new directory */    
-    dir_create_link(name, ".", sector);
+    dir_add(new_dir, ".", sector);
 
     /* Add a new dir entry called ".." in the new directory */
-    dir_create_link(name, "..", d->inode->start);
+    if (sector == ROOT_DIR_SECTOR)
+        /* Special case when new_dir is the root dir: points to itself */
+        dir_add(new_dir, "..", sector);
+    else
+        dir_add(new_dir, "..", inode_get_inumber(d->inode));
 
-    //inode_close (i);
-    //dir_close (d);
+    dir_close (d);
   }
   return ret_val;
+}
+
+bool
+dir_create_root ()
+{
+
+    return false;
 }
 
 /* Opens and returns the directory for the given INODE, of which
