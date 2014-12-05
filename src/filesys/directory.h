@@ -32,5 +32,5 @@ bool dir_readdir (struct dir *, char name[NAME_MAX + 1]);
 bool dir_create_link (const char *, const char *, block_sector_t);
 bool dir_isempty (struct dir *);
 bool dir_mkdir (const char *);
-
+void dir_ls (struct dir *);
 #endif /* filesys/directory.h */
