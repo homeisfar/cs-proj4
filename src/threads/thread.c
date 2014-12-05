@@ -214,11 +214,9 @@ thread_create (const char *name, int priority,
   /* Add child thread to parent's child list */
   list_push_back (&thread_current ()->child_list, &t->child_elem);
   t->parent = thread_current ();
-  // dir_open_root ();
-  // if (thread_current () == initial_thread)
-  //   t->cur_dir = dir_open_root ();
-  // else
-  //   t->cur_dir = dir_reopen (thread_current ()->cur_dir);
+  // if (thread_current ()->cur_dir != NULL)
+    // printf ("J %i \n", thread_current ()->cur_dir == NULL);
+    // t->cur_dir = thread_current ()->cur_dir;
 
   intr_set_level (old_level);
 
@@ -517,6 +515,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init (&t->sys_wait_reap, 0);
   t->fd_size = 0;
   memset (t->fds, 0, FDMAX*sizeof (struct file *));
+  t->cur_dir = NULL;
 
   list_push_back (&all_list, &t->allelem);
 }

@@ -137,7 +137,7 @@ filesys_pathfinder (const char *name, char *filename)
         cur_dir = dir_open_root ();
       else
         {
-        cur_dir = dir_reopen (thread_current ()->cur_dir);     // Relative path
+          cur_dir = dir_reopen (thread_current ()->cur_dir);     // Relative path
         }
     }
 

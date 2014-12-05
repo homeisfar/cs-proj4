@@ -296,6 +296,7 @@ sys_exit (int status)
     t->name, t->exit_status);
   putbuf (output, num_bytes);
   file_close (t->self_executable);
+  dir_close (t->cur_dir);
   lock_release (&fs_lock);
   thread_exit ();
 }
@@ -613,7 +614,7 @@ sys_chdir (const char *dir)
   struct dir *parent_new = filesys_pathfinder (dir, filename);
   if (parent_new == NULL || !dir_lookup (parent_new, filename, &inode))
     {
-      sys_exit (-1);
+      // PANIC ("HI, %i", !dir_lookup (parent_new, filename, &inode));
       return false;
     }
   struct dir *new = dir_open (inode);
@@ -683,7 +684,7 @@ sys_inumber (int fd)
 {
   struct thread *t = thread_current ();
   struct file *f;
-  fd = valid_index (fd);
+  fd = valid_index (fd); 
   if (fd < 0)
     {
       sys_exit (-1);
