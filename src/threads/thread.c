@@ -16,6 +16,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "filesys/directory.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -211,9 +212,9 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   /* Add child thread to parent's child list */
-  list_push_back(&thread_current ()->child_list, &t->child_elem);
+  list_push_back (&thread_current ()->child_list, &t->child_elem);
   t->parent = thread_current ();
-  t->cur_dir = thread_current ()->cur_dir;
+  t->cur_dir = dir_open_root ();
 
   intr_set_level (old_level);
 
