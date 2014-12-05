@@ -90,7 +90,7 @@ filesys_remove (const char *name)
 {
   char *filename = calloc (strlen (name) + 1, sizeof (char));
   struct dir *dir = filesys_pathfinder (name, filename);
-  bool success = dir != NULL && dir_remove (dir, filename);
+  bool success = dir != NULL && dir_isempty (dir) && dir_remove (dir, filename);
   dir_close (dir); 
   free (filename);
 
@@ -112,7 +112,7 @@ do_format (void)
 /* Navigates file hierarchy to get to desired directory.
   Returns null pointer if invalid path. */
 struct dir *
-filesys_pathfinder (char *name, char *filename)
+filesys_pathfinder (const char *name, char *filename)
 {
   struct dir *cur_dir;
   struct dir *prev_dir;
@@ -131,7 +131,12 @@ filesys_pathfinder (char *name, char *filename)
   if (strcspn (name, "/") == 0)
       cur_dir = dir_open_root ();               // Absolute path
   else 
-      cur_dir = dir_open_root (); //thread_current ()->cur_dir;     // Relative path
+    {
+      if (thread_current ()->cur_dir == NULL)
+        cur_dir = dir_open_root ();
+      else
+        cur_dir = dir_reopen (thread_current ()->cur_dir);     // Relative path
+    }
 
   // tokenize fn_copy
   for (token = strtok_r (fn_copy, "/", &save_ptr);

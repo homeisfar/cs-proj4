@@ -282,3 +282,29 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
     }
   return false;
 }
+
+bool
+dir_isempty (struct dir *dir)
+{
+  off_t old_pos = dir->pos;
+  dir->pos = 0;
+  int count = 0;
+  bool isempty = true;
+
+  struct dir_entry e;
+
+  while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
+    {
+      dir->pos += sizeof e;
+      if (e.in_use)
+        count++;
+      if (count >= 3)
+        {
+          isempty = false;
+          break;
+        }
+    }
+
+  dir->pos = old_pos;
+  return isempty;
+}

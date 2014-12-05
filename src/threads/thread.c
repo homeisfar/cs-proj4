@@ -214,7 +214,7 @@ thread_create (const char *name, int priority,
   /* Add child thread to parent's child list */
   list_push_back (&thread_current ()->child_list, &t->child_elem);
   t->parent = thread_current ();
-  dir_open_root ();
+  // dir_open_root ();
   // if (thread_current () == initial_thread)
   //   t->cur_dir = dir_open_root ();
   // else
