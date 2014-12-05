@@ -57,6 +57,7 @@ filesys_create (const char *name, off_t initial_size)
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
+
   free (filename);
   return success;
 }
@@ -135,7 +136,9 @@ filesys_pathfinder (const char *name, char *filename)
       if (thread_current ()->cur_dir == NULL)
         cur_dir = dir_open_root ();
       else
+        {
         cur_dir = dir_reopen (thread_current ()->cur_dir);     // Relative path
+        }
     }
 
   // tokenize fn_copy

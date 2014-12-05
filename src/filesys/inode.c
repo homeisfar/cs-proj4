@@ -41,7 +41,6 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
-    bool dir;
   };
 
 off_t boundary_sectors (struct inode_disk *, off_t);
@@ -145,7 +144,6 @@ inode_create (block_sector_t sector, off_t length, bool dir)
               static char zeros[BLOCK_SECTOR_SIZE];
               size_t i = 0;
               block_sector_t alloc_sector;
-
               // Adding extension capability
               while (i < sectors) 
                 {
@@ -207,7 +205,6 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
-  inode->dir = &inode->data.isdir;
   block_read (fs_device, inode->sector, &inode->data);
   return inode;
 }
@@ -510,10 +507,9 @@ static block_sector_t
 extend_by_one (struct inode_disk *inode)
 {
   block_sector_t alloc_sec;
-  off_t next_idx = inode->length / 512 - 1; // minus 1 to account for .start
+  off_t next_idx = inode->length / 512;
   off_t direct = DIRECTNUM;
   off_t indirect = direct + 128;
-
   // Checks & allocates if enough filesys space present for extension
   if (!free_map_count (1) || !free_map_allocate (1, &alloc_sec))
     return -1;
@@ -595,5 +591,5 @@ release_sectors (struct inode *inode)
 bool
 inode_is_dir (struct inode *inode)
 {
-  return inode->dir;
+  return inode->data.isdir;
 }

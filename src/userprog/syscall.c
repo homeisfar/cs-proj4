@@ -13,6 +13,8 @@
 #include "lib/kernel/console.h"
 #include "threads/synch.h"
 #include "devices/input.h"
+#include "filesys/directory.h"
+#include "filesys/inode.h"
 
 static void syscall_handler (struct intr_frame *);
 /* Project created methods */
@@ -419,7 +421,7 @@ sys_read (int fd, void *buffer, unsigned size)
 	struct thread *t;
 	t = thread_current ();
 	int bytes_read = 0;
-	char string_from_key;
+	// char string_from_key;
 	if (fd == 0)
 		{
       char *strbuf = buffer;
@@ -456,9 +458,9 @@ read_helper (struct file *file, void *buffer, off_t size)
 int
 sys_write (int fd, const void *buffer, uint32_t size)
 {
-  struct thread *t;
+  struct thread *t = thread_current ();
   struct file *f;
-  t = thread_current ();
+  struct inode *inode;
   int bytes_out = 0;
 
   if (fd == 1)
@@ -481,8 +483,9 @@ sys_write (int fd, const void *buffer, uint32_t size)
     f = t->fds[fd];
     if (f)
     {
-      // if (file_isdir (f))
-      //   return 0;
+      inode = file_get_inode (f); 
+      if (inode_is_dir (inode))
+        return -1; 
       bytes_out = write_helper (f, buffer, (off_t) size);
       return bytes_out;
     }
@@ -604,39 +607,34 @@ close_helper (struct file *file)
 bool
 sys_chdir (const char *dir)
 {
-  struct thread *t = thread_current ();
+  struct thread *t = thread_current (); 
   struct inode *inode;
-
-  char *filename = calloc (strlen (dir) + 1, sizeof (char));
-  struct dir *parent_new = filesys_pathfinder (dir, &filename);
-  if (!dir_lookup (parent_new, filename, &inode))
+  char filename[NAME_MAX + 1];
+  struct dir *parent_new = filesys_pathfinder (dir, filename);
+  if (parent_new == NULL || !dir_lookup (parent_new, filename, &inode))
     {
-      free (filename);
+      sys_exit (-1);
       return false;
     }
-  free (filename);
   struct dir *new = dir_open (inode);
-  if ((new == NULL) || 
-      (t->cur_dir != NULL && !dir_close (t->cur_dir)))
+  if (new == NULL)
     return false;
+  dir_close (t->cur_dir);
   t->cur_dir = new;
   return true;
 }
 
 /* Create a directory. */
-// Check for abs/rel paths
 bool
 sys_mkdir (const char *dir)
 {
-  return true;
+  return dir_mkdir (dir);
 }
 
 /* Reads a directory entry. */
-// Should not return "." and ".."
 bool
 sys_readdir (int fd, char *name)
 {
-  // PANIC ("name: %i", strlen (name));
   struct thread *t = thread_current ();
   struct file *f;
   fd = valid_index (fd);

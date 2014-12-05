@@ -6,6 +6,7 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+#include "filesys/free-map.h"
 
 /* A directory. */
 struct dir 
@@ -22,22 +23,18 @@ struct dir_entry
     bool in_use;                        /* In use or free? */
   };
 
-
 bool
 dir_create_link (const char *parent_dir, const char *new_dir, block_sector_t sector) 
 {
-  char *filename = calloc (strlen (parent_dir) + 1, sizeof (char));
+  char filename[NAME_MAX + 1];
   struct dir *dir = filesys_pathfinder (parent_dir, filename);
   bool success = (dir != NULL
                   && dir_add (dir, new_dir, sector));
   //if (!success && inode_sector != 0) 
   //  free_map_release (inode_sector, 1);
   dir_close (dir);
-  free (filename);
   return success;
 }
-
-
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
@@ -48,35 +45,28 @@ dir_create (block_sector_t sector, size_t entry_cnt)
    * therefore we need to block_read to get the first data sector,
    * and pass that into
    */
-  struct thread *t = thread_current();
+  struct thread *t = thread_current ();
   bool ret_val = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
-  struct dir *d = t->cur_dir ? t->cur_dir : dir_open_root();
+  struct dir *d = t->cur_dir ? t->cur_dir : dir_open_root ();
   /* Add a new dir entry in the current dir for the new dir */
   //dir_add(d, name, sector);
   if (ret_val)
   {
-    struct inode *inode = inode_open(sector);
-    struct dir *new_dir = dir_open(inode);
+    struct inode *inode = inode_open (sector);
+    struct dir *new_dir = dir_open (inode);
     /* Add a new dir entry called "." in the new directory */    
-    dir_add(new_dir, ".", sector);
+    dir_add (new_dir, ".", sector);
 
     /* Add a new dir entry called ".." in the new directory */
     if (sector == ROOT_DIR_SECTOR)
         /* Special case when new_dir is the root dir: points to itself */
-        dir_add(new_dir, "..", sector);
+        dir_add (new_dir, "..", sector);
     else
-        dir_add(new_dir, "..", inode_get_inumber(d->inode));
+        dir_add (new_dir, "..", inode_get_inumber (d->inode));
 
     dir_close (d);
   }
   return ret_val;
-}
-
-bool
-dir_create_root ()
-{
-
-    return false;
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -329,4 +319,21 @@ dir_isempty (struct dir *dir)
 
   dir->pos = old_pos;
   return isempty;
+}
+
+bool
+dir_mkdir (const char *name)
+{
+  block_sector_t sector;
+  struct dir *parent_dir;
+  char filename[NAME_MAX + 1];
+  bool success;
+
+  if (!free_map_allocate (1, &sector)) 
+    return false;
+  parent_dir = filesys_pathfinder (name, filename);
+  success = dir_create (sector, 0) && dir_add (parent_dir, filename, sector);
+  if (!success)
+    free_map_release (sector, 1);
+  return success;
 }
