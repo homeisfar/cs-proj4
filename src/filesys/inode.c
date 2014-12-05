@@ -556,8 +556,11 @@ release_sectors (struct inode *inode)
   block_write (fs_device, inode->sector, &inode->data);
 
   // Deallocate data blocks
-  free_map_release (dealloc, 1);
-  inode->data.length -= inode->data.length % BLOCK_SECTOR_SIZE;
+  if (inode->data.length % BLOCK_SECTOR_SIZE != 0)
+    {
+      free_map_release (dealloc, 1);
+      inode->data.length -= inode->data.length % BLOCK_SECTOR_SIZE;
+    }
 
   while (inode->data.length > 0)
     {

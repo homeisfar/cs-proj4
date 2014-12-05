@@ -331,7 +331,7 @@ dir_mkdir (const char *name)
 
   if (!free_map_allocate (1, &sector)) 
     return false;
-  parent_dir = dir_reopen (filesys_pathfinder (name, filename));
+  parent_dir = filesys_pathfinder (name, filename);
   success = dir_create (sector, 0) && dir_add (parent_dir, filename, sector);
   if (!success)
     free_map_release (sector, 1);
