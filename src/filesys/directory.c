@@ -22,25 +22,51 @@ struct dir_entry
     bool in_use;                        /* In use or free? */
   };
 
+
+bool
+dir_create_link (const char *parent_dir, const char *new_dir, byte_sector_t sector) 
+{
+  char *filename = calloc (strlen (parent_dir) + 1, sizeof (char));
+  struct dir *dir = filesys_pathfinder (parent_dir, filename);
+  bool success = (dir != NULL
+                  && dir_add (dir, new_dir, sector));
+  //if (!success && inode_sector != 0) 
+  //  free_map_release (inode_sector, 1);
+  dir_close (dir);
+  free (filename);
+  return success;
+}
+
+
+
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
-dir_create (block_sector_t sector, size_t entry_cnt)
+dir_create (const char* name, block_sector_t sector, size_t entry_cnt)
 {
   /* inode is created at sector
    * therefore we need to block_read to get the first data sector,
    * and pass that into
    */
-  bool ret_val= inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  struct thread *t = thread_current();
+  bool ret_val = inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
+  struct dir *d = t->cur_dir ? t->cur_dir : dir_open_root();
+  /* Add a new dir entry in the current dir for the new dir */
+  dir_add(d, name, sector);
   if (ret_val)
   {
-    struct inode *i = inode_open (sector);
-    struct dir *d = dir_open (i);
-    filesys_create (".", sizeof (d)); //NOT SURE IF DIR OR DIR_ENTRY
-    
-    // dir_add (d, ".", sector); //incomplete b/c "." isn't a file yet.
-    inode_close (i);
-    dir_close (d);
+    //struct inode *i = inode_open (sector);
+    //struct dir *d = dir_open (i);
+    //filesys_create (".", sizeof (d)); //NOT SURE IF DIR OR DIR_ENTRY
+
+    /* Add a new dir entry called "." in the new directory */    
+    dir_create_link(name, ".", sector);
+
+    /* Add a new dir entry called ".." in the new directory */
+    dir_create_link(name, "..", d->inode->start);
+
+    //inode_close (i);
+    //dir_close (d);
   }
   return ret_val;
 }
