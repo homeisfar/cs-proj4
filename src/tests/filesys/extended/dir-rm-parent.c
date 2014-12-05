@@ -11,8 +11,6 @@ test_main (void)
   CHECK (mkdir ("a"), "mkdir \"a\"");
   CHECK (chdir ("a"), "chdir \"a\"");
   CHECK (mkdir ("b"), "mkdir \"b\"");
-  // PANIC ("hello\n");
   CHECK (chdir ("b"), "chdir \"b\"");
-  printf ("HI");
   CHECK (!remove ("/a"), "remove \"/a\" (must fail)");
 }

@@ -64,7 +64,7 @@ dir_create (block_sector_t sector, size_t entry_cnt)
     else
         dir_add (new_dir, "..", inode_get_inumber (d->inode));
 
-    dir_close (d);
+    dir_close (new_dir);
   }
   return ret_val;
 }

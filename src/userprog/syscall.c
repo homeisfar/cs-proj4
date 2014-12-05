@@ -615,22 +615,13 @@ sys_chdir (const char *dir)
 
   if (parent_new == NULL || !dir_lookup (parent_new, filename, &inode))
     {
-      printf ("exit ");
-      dir_ls (t->cur_dir);
-      sys_exit(-1);
       return false;
     }
   struct dir *new = dir_open (inode);
   if (new == NULL)
     return false;
   dir_close (t->cur_dir);
-  printf ("Now inside ");
-  dir_ls (new);
-  printf ("End inside \n");
-
   t->cur_dir = new;
-    dir_ls (t->cur_dir);
-
   return true;
 }
 
@@ -638,12 +629,7 @@ sys_chdir (const char *dir)
 bool
 sys_mkdir (const char *dir)
 {
-  bool s = dir_mkdir (dir);
-  printf ("hello \n");
-    char filename[NAME_MAX + 1];
-
-  dir_ls (filesys_pathfinder (dir, filename));
-  return s;
+  return dir_mkdir (dir); 
 }
 
 /* Reads a directory entry. */
