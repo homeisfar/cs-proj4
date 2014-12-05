@@ -337,3 +337,14 @@ dir_mkdir (const char *name)
     free_map_release (sector, 1);
   return success;
 }
+
+void 
+dir_ls (struct dir *dir) 
+{
+    struct dir_entry e;
+    off_t ofs;
+    for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e) 
+        if (e.in_use)
+            printf(e.name);            
+}
