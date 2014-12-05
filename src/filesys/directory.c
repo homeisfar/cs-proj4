@@ -38,7 +38,7 @@ dir_create (block_sector_t sector, size_t entry_cnt)
     struct dir *d = dir_open (i);
     filesys_create (".", sizeof (d)); //NOT SURE IF DIR OR DIR_ENTRY
     
-    // dir_add (d, ".", sector); //incomplete b/c "." isn't a file yet.
+    dir_add (d, ".", sector); //incomplete b/c "." isn't a file yet.
     inode_close (i);
     dir_close (d);
   }
@@ -223,6 +223,17 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  if (inode_is_dir (inode))
+    {
+      struct dir *remdir = dir_open (inode);
+      if (!dir_isempty (remdir))
+        {
+          free (remdir);
+          goto done;
+        }
+      free (remdir);
+    }
+
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
@@ -240,6 +251,7 @@ dir_remove (struct dir *dir, const char *name)
 /* Reads the next directory entry in DIR and stores the name in
    NAME.  Returns true if successful, false if the directory
    contains no more entries. */
+// Easier to not return "." and ".." here... move it here?
 bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {

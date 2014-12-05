@@ -600,22 +600,21 @@ close_helper (struct file *file)
 }
 
 /* Change the current directory. */
+// Check for abs/rel paths
 bool
 sys_chdir (const char *dir)
 {
-  // lookup new dir
-  if (!dir_reopen (dir))
-    return false; 
-  // close old dir and open new one (?)
   struct thread *t = thread_current ();
-  struct dir *old_dir = t->cur_dir;
-  if (!dir_close (old_dir))
+  struct dir *new = dir_reopen (dir);
+  if ((new == NULL) || 
+      (t->cur_dir != NULL && !dir_close (t->cur_dir)))
     return false;
-  t->cur_dir = dir;
+  t->cur_dir = new;
   return true;
 }
 
 /* Create a directory. */
+// Check for abs/rel paths
 bool
 sys_mkdir (const char *dir)
 {
@@ -624,12 +623,12 @@ sys_mkdir (const char *dir)
 }
 
 /* Reads a directory entry. */
+// Should not return "." and ".."
 bool
 sys_readdir (int fd, char *name)
 {
-  struct thread *t;
+  struct thread *t = thread_current ();
   struct file *f;
-  t = thread_current ();
   fd = valid_index (fd);
   if (fd < 0)
     {
@@ -639,7 +638,13 @@ sys_readdir (int fd, char *name)
   f = t->fds[fd];
   if (f && file_isdir (f))
     {
-      dir_readdir (struct dir *dir, char name[NAME_MAX + 1]);
+      struct dir *readdir = dir_open (file_get_inode (f));
+      if (readdir == NULL)
+        {
+          sys_exit (-1);
+          return -1;  // gets rid of warning
+        }
+      return dir_readdir (readdir, name); // Should not return "." and ".."
     }
   sys_exit (-1);
   return false;
@@ -649,9 +654,8 @@ sys_readdir (int fd, char *name)
 bool
 sys_isdir (int fd)
 {
-  struct thread *t;
+  struct thread *t = thread_current ();
   struct file *f;
-  t = thread_current ();
   fd = valid_index (fd);
   if (fd < 0)
     {
@@ -669,9 +673,8 @@ sys_isdir (int fd)
 int
 sys_inumber (int fd)
 {
-  struct thread *t;
+  struct thread *t = thread_current ();
   struct file *f;
-  t = thread_current ();
   fd = valid_index (fd);
   if (fd < 0)
     {
@@ -682,7 +685,7 @@ sys_inumber (int fd)
   if (f)
     {
       struct inode *ino = file_get_inode (f);
-      //return ino->sector;
+      return inode_get_inumber (ino);
     }
   sys_exit (-1);
   return -1;  // gets rid of warning
