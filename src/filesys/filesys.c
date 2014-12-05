@@ -131,7 +131,12 @@ filesys_pathfinder (char *name, char *filename)
   if (strcspn (name, "/") == 0)
       cur_dir = dir_open_root ();               // Absolute path
   else 
-      cur_dir = dir_open_root (); //thread_current ()->cur_dir;     // Relative path
+    {
+      if (thread_current ()->cur_dir == NULL)
+        cur_dir = dir_open_root ();
+      else
+        cur_dir = dir_reopen (thread_current ()->cur_dir);     // Relative path
+    }
 
   // tokenize fn_copy
   for (token = strtok_r (fn_copy, "/", &save_ptr);

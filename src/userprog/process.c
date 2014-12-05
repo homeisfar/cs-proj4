@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "filesys/directory.h"
 
 /* Padding to byte align the user's stack */
 #define PADDING(x) ((sizeof (void *) - x) & (sizeof (void *) - 1))
@@ -52,7 +53,6 @@ process_execute (const char *file_name)
     strlcpy (fn_copy, file_name, PGSIZE);
 
     /* Create a new thread to execute FILE_NAME. */
-
     char program[15] = {0};
     char *save_ptr;
     strlcpy (program, file_name, 15);
@@ -92,7 +92,7 @@ start_process (void *file_name_)
     if_.cs = SEL_UCSEG;
     if_.eflags = FLAG_IF | FLAG_MBS;
     success = load (file_name, &if_.eip, &if_.esp);
-    struct thread *current = thread_current();
+    struct thread *current = thread_current ();
 
     // sema-up/down here for exec
     if (!success)
