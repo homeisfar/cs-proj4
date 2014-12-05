@@ -605,7 +605,17 @@ bool
 sys_chdir (const char *dir)
 {
   struct thread *t = thread_current ();
-  struct dir *new = dir_reopen (dir);
+  struct inode *inode;
+
+  char *filename = calloc (strlen (dir) + 1, sizeof (char));
+  struct dir *parent_new = filesys_pathfinder (dir, &filename);
+  if (!dir_lookup (parent_new, filename, &inode))
+    {
+      free (filename);
+      return false;
+    }
+  free (filename);
+  struct dir *new = dir_open (inode);
   if ((new == NULL) || 
       (t->cur_dir != NULL && !dir_close (t->cur_dir)))
     return false;
@@ -618,8 +628,7 @@ sys_chdir (const char *dir)
 bool
 sys_mkdir (const char *dir)
 {
-  filesys_create;
-  // return true;
+  return true;
 }
 
 /* Reads a directory entry. */
@@ -627,6 +636,7 @@ sys_mkdir (const char *dir)
 bool
 sys_readdir (int fd, char *name)
 {
+  // PANIC ("name: %i", strlen (name));
   struct thread *t = thread_current ();
   struct file *f;
   fd = valid_index (fd);
