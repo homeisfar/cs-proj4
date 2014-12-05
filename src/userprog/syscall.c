@@ -296,7 +296,7 @@ sys_exit (int status)
     t->name, t->exit_status);
   putbuf (output, num_bytes);
   file_close (t->self_executable);
-  dir_close (t->cur_dir);
+  // dir_close (t->cur_dir);
   lock_release (&fs_lock);
   thread_exit ();
 }
@@ -612,16 +612,25 @@ sys_chdir (const char *dir)
   struct inode *inode;
   char filename[NAME_MAX + 1];
   struct dir *parent_new = filesys_pathfinder (dir, filename);
+
   if (parent_new == NULL || !dir_lookup (parent_new, filename, &inode))
     {
-      // PANIC ("HI, %i", !dir_lookup (parent_new, filename, &inode));
+      printf ("exit ");
+      dir_ls (t->cur_dir);
+      sys_exit(-1);
       return false;
     }
   struct dir *new = dir_open (inode);
   if (new == NULL)
     return false;
   dir_close (t->cur_dir);
+  printf ("Now inside ");
+  dir_ls (new);
+  printf ("End inside \n");
+
   t->cur_dir = new;
+    dir_ls (t->cur_dir);
+
   return true;
 }
 
@@ -629,7 +638,12 @@ sys_chdir (const char *dir)
 bool
 sys_mkdir (const char *dir)
 {
-  return dir_mkdir (dir);
+  bool s = dir_mkdir (dir);
+  printf ("hello \n");
+    char filename[NAME_MAX + 1];
+
+  dir_ls (filesys_pathfinder (dir, filename));
+  return s;
 }
 
 /* Reads a directory entry. */
