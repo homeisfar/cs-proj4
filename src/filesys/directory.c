@@ -346,5 +346,5 @@ dir_ls (struct dir *dir)
     for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) 
         if (e.in_use)
-            printf(e.name);            
+            printf("%s\n", e.name);            
 }
