@@ -6,6 +6,8 @@
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "threads/thread.h"
+#include "threads/malloc.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -46,15 +48,16 @@ bool
 filesys_create (const char *name, off_t initial_size) 
 {
   block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
+  char *filename = calloc (strlen (name) + 1, sizeof (char));
+  struct dir *dir = filesys_pathfinder (name, filename);
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size)
-                  && dir_add (dir, name, inode_sector));
+                  && dir_add (dir, filename, inode_sector));
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);
   dir_close (dir);
-
+  free (filename);
   return success;
 }
 
@@ -66,12 +69,14 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_root ();
+  char *filename = calloc (strlen (name) + 1, sizeof (char));
+  struct dir *dir = filesys_pathfinder (name, filename);
   struct inode *inode = NULL;
 
   if (dir != NULL)
-    dir_lookup (dir, name, &inode);
+    dir_lookup (dir, filename, &inode);
   dir_close (dir);
+  free (filename);
 
   return file_open (inode);
 }
@@ -83,9 +88,11 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_root ();
-  bool success = dir != NULL && dir_remove (dir, name);
+  char *filename = calloc (strlen (name) + 1, sizeof (char));
+  struct dir *dir = filesys_pathfinder (name, filename);
+  bool success = dir != NULL && dir_remove (dir, filename);
   dir_close (dir); 
+  free (filename);
 
   return success;
 }
@@ -102,21 +109,51 @@ do_format (void)
   printf ("done.\n");
 }
 
-/* Navigates file hierarchy to get to correct file/dir */
-struct file *
-filesys_pathfinder (char *name)
+/* Navigates file hierarchy to get to desired directory.
+  Returns null pointer if invalid path. */
+struct dir *
+filesys_pathfinder (char *name, char *filename)
 {
-  strtok_r (char *s, const char *delimiters, char **save_ptr) 
+  struct dir *cur_dir;
+  struct dir *prev_dir;
+  struct inode *cur_inode;
 
-  // Keep string 'head' that tracks latest string?
+  char *path_dir[96];   // (Arbitrary) number of path files allowed
+  int path_len = 0;  // Number of files in path
+  int count = 0;
+  char *token, *save_ptr;
 
-  if (name[0] == '/')
-    {
-      // Absolute path
-    }
+  char *fn_copy;
+  size_t str_len = strlen (name) + 1;
+  fn_copy = calloc (str_len, sizeof (char));
+  strlcpy (fn_copy, name, str_len);
+
+  if (strcspn (name, "/") == 0)
+      cur_dir = dir_open_root ();               // Absolute path
   else 
-    {
-      // Relative path
-    }
-}
+      cur_dir = dir_open_root (); //thread_current ()->cur_dir;     // Relative path
 
+  // tokenize fn_copy
+  for (token = strtok_r (fn_copy, "/", &save_ptr);
+    token != NULL; token = strtok_r (NULL, "/", &save_ptr))
+    path_dir[path_len++] = token;  
+
+  // Loops over path files until reaches invalid dir or end of path
+  while ((cur_dir != NULL) && (count < path_len - 1))
+    {
+      if (!dir_lookup (cur_dir, path_dir[count], &cur_inode))
+        return NULL;
+      prev_dir = cur_dir;
+      cur_dir = dir_open (cur_inode);
+      dir_close (prev_dir);
+      count++;
+    }
+
+  if (path_len == 0)
+    strlcpy (filename, "/0", 1);
+  else
+    strlcpy (filename, path_dir[count], strlen (path_dir[count]) + 1);
+
+  free (fn_copy);
+  return cur_dir; 
+}

@@ -213,7 +213,7 @@ thread_create (const char *name, int priority,
   /* Add child thread to parent's child list */
   list_push_back(&thread_current ()->child_list, &t->child_elem);
   t->parent = thread_current ();
-  // t->cur_dir = thread_current ()->cur_dir;
+  t->cur_dir = thread_current ()->cur_dir;
 
   intr_set_level (old_level);
 
