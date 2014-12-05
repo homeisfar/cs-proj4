@@ -109,7 +109,9 @@ dir_open_root (void)
 struct dir *
 dir_open_current (void)
 {
-    return thread_current ()->dir;
+  if (thread_current ()->cur_dir == NULL)
+    return dir_open_root ();
+  return thread_current ()->cur_dir;
 }
 
 /* Opens and returns a new directory for the same inode as DIR.
@@ -257,6 +259,17 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  if (inode_is_dir (inode))
+    {
+      struct dir *remdir = dir_open (inode);
+      if (!dir_isempty (remdir))
+        {
+          free (remdir);
+          goto done;
+        }
+      free (remdir);
+    }
+
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
@@ -274,6 +287,7 @@ dir_remove (struct dir *dir, const char *name)
 /* Reads the next directory entry in DIR and stores the name in
    NAME.  Returns true if successful, false if the directory
    contains no more entries. */
+// Easier to not return "." and ".." here... do it here?
 bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
@@ -282,7 +296,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
       dir->pos += sizeof e;
-      if (e.in_use)
+      if (e.in_use && (strcmp (e.name, ".") != 0) && (strcmp (e.name, "..") != 0))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;

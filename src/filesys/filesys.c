@@ -90,7 +90,7 @@ filesys_remove (const char *name)
 {
   char *filename = calloc (strlen (name) + 1, sizeof (char));
   struct dir *dir = filesys_pathfinder (name, filename);
-  bool success = dir != NULL && dir_isempty (dir) && dir_remove (dir, filename);
+  bool success = dir != NULL && dir_remove (dir, filename);
   dir_close (dir); 
   free (filename);
 

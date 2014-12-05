@@ -42,8 +42,6 @@ struct inode
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
     bool dir;
-    // block_sector_t *indirect;
-    // block_sector_t **d_indirect;
   };
 
 off_t boundary_sectors (struct inode_disk *, off_t);
@@ -251,8 +249,6 @@ inode_close (struct inode *inode)
         {
           release_sectors (inode);
           free_map_release (inode->sector, 1);
-          // free_map_release (inode->data.start,
-          //                   bytes_to_sectors (inode->data.length)); 
         }
 
       free (inode); 
