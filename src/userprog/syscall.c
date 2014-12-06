@@ -248,6 +248,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         f->esp = pop (f->esp, (void *) &arg1, sizeof (uint32_t));
         valid_ptr (f->esp);
         f->eax = sys_readdir (arg0, arg1);
+        break;
       }
 
     case SYS_ISDIR: 
@@ -648,12 +649,17 @@ sys_readdir (int fd, char *name)
   if (f && file_isdir (f))
     {
       struct dir *readdir = dir_open (file_get_inode (f));
+      /* Set pos */
+      dir_setpos(readdir, file_tell(f));
       if (readdir == NULL)
         {
           sys_exit (-1);
           return -1;  // gets rid of warning
         }
-      return dir_readdir (readdir, name); // Should not return "." and ".."
+      bool retval = dir_readdir(readdir, name);
+      file_seek(f, dir_getpos(readdir));
+      //dir_close(readdir);
+      return retval; // Should not return "." and ".."
     }
   sys_exit (-1);
   return false;

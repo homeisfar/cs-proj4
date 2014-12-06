@@ -274,6 +274,18 @@ dir_remove (struct dir *dir, const char *name)
   return success;
 }
 
+void
+dir_setpos(struct dir *dir, off_t pos)
+{
+    dir->pos = pos;    
+}
+
+off_t
+dir_getpos(struct dir *dir)
+{
+    return dir->pos;
+}
+
 /* Reads the next directory entry in DIR and stores the name in
    NAME.  Returns true if successful, false if the directory
    contains no more entries. */
@@ -281,14 +293,15 @@ dir_remove (struct dir *dir, const char *name)
 bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
+    //printf("pos: %d\n", dir->pos);
   struct dir_entry e;
-
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
-      dir->pos += sizeof e;
+      dir->pos += sizeof (e);
       if (e.in_use && (strcmp (e.name, ".") != 0) && (strcmp (e.name, "..") != 0))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
+            //printf("after pos: %d\n", dir->pos);
           return true;
         } 
     }
