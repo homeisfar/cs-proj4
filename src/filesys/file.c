@@ -51,6 +51,8 @@ file_close (struct file *file)
       inode_close (file->inode);
       free (file); 
     }
+  else
+    PANIC ("HI");
 }
 
 /* Returns the inode encapsulated by FILE. */

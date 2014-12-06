@@ -165,7 +165,6 @@ filesys_pathfinder (const char *name, char *filename)
   else
     strlcpy (filename, path_dir[count], strlen (path_dir[count]) + 1);
 
-// PANIC ("%s %i", name, (strcmp (name, "/") == 0));
   free (fn_copy);
   return cur_dir; 
 }

@@ -72,7 +72,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
-
   int sys_call_num;
   void *default_esp = f->esp;
   valid_ptr (f->esp);
@@ -577,15 +576,11 @@ tell_helper (struct file *file)
 void
 sys_close (int fd)
 {
-  struct thread *t;
-  uint32_t size;
-
-  t = thread_current ();
-  size = t->fd_size;
+  struct thread *t = thread_current ();
 
   // if fd-2 is a valid index and the file descriptor corresponds
   // to an open file
-  if (fd > 1 && (fd-2) < (int) size && t->fds[fd-2])
+  if (fd > 1 && (fd-2) < (int) FDMAX && t->fds[fd-2])
   {
     close_helper (t->fds[fd-2]);
     t->fds[fd-2] = NULL;
@@ -658,8 +653,7 @@ sys_readdir (int fd, char *name)
         }
       bool retval = dir_readdir(readdir, name);
       file_seek(f, dir_getpos(readdir));
-      //dir_close(readdir);
-      return retval; // Should not return "." and ".."
+      return retval;
     }
   sys_exit (-1);
   return false;
