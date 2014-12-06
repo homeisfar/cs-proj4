@@ -72,12 +72,15 @@ filesys_open (const char *name)
 {
   char *filename = calloc (strlen (name) + 1, sizeof (char));
   struct dir *dir = filesys_pathfinder (name, filename);
-  struct inode *inode = NULL;
+  struct inode *inode = NULL; 
 
   if (dir != NULL)
     dir_lookup (dir, filename, &inode);
   dir_close (dir);
   free (filename);
+  
+  if (strcmp (name, "/") == 0)
+    inode = dir_get_inode (dir_open_root ());
 
   return file_open (inode);
 }
@@ -157,11 +160,12 @@ filesys_pathfinder (const char *name, char *filename)
       count++;
     }
 
-  if (path_len == 0)
-    strlcpy (filename, "/0", 1);
+  if (path_len == 0 || (strcmp (name, "/") == 0))
+    strlcpy (filename, name, str_len);
   else
     strlcpy (filename, path_dir[count], strlen (path_dir[count]) + 1);
 
+// PANIC ("%s %i", name, (strcmp (name, "/") == 0));
   free (fn_copy);
   return cur_dir; 
 }

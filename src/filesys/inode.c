@@ -164,12 +164,13 @@ inode_create (block_sector_t sector, off_t length, bool dir)
         		      i++;
         		    }
             }
-          disk_inode->length = length;  
-          block_write (fs_device, sector, disk_inode); 
           success = true; 
         }
+      disk_inode->length = length;  
+      block_write (fs_device, sector, disk_inode); 
       free (disk_inode);
     }
+  // printf(" %i\n", );
   return success;
 }
 
