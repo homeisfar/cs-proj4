@@ -47,6 +47,7 @@ off_t boundary_sectors (struct inode_disk *, off_t);
 static block_sector_t extend_by_one (struct inode_disk *);
 void release_sectors (struct inode *);
 
+/* Charling drove here */
 /* Returns the block device sector that contains byte offset POS
    within INODE.
    Returns -1 if INODE does not contain data for a byte at offset
@@ -439,6 +440,12 @@ off_t
 inode_length (const struct inode *inode)
 {
   return inode->data.length;
+}
+
+off_t
+inode_opencnt (const struct inode *inode)
+{
+  return inode->open_cnt;
 }
 
 // Below functions assume inode->data.length is length of current file, not

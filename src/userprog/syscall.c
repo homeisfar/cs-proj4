@@ -12,6 +12,7 @@
 #include "filesys/file.h"
 #include "lib/kernel/console.h"
 #include "threads/synch.h"
+#include "lib/string.h"
 #include "devices/input.h"
 #include "filesys/directory.h"
 #include "filesys/inode.h"
@@ -296,7 +297,7 @@ sys_exit (int status)
     t->name, t->exit_status);
   putbuf (output, num_bytes);
   file_close (t->self_executable);
-  // dir_close (t->cur_dir);
+  dir_close (t->cur_dir);
   lock_release (&fs_lock);
   thread_exit ();
 }
@@ -609,7 +610,10 @@ sys_chdir (const char *dir)
   char filename[NAME_MAX + 1];
   struct dir *parent_new = filesys_pathfinder (dir, filename);
 
-  if (parent_new == NULL || !dir_lookup (parent_new, filename, &inode))
+  if (strcmp (dir, "/") == 0)
+    inode = inode_open (ROOT_DIR_SECTOR);
+
+  else if (!dir_lookup (parent_new, filename, &inode))
     {
       return false;
     }
@@ -645,14 +649,14 @@ sys_readdir (int fd, char *name)
     {
       struct dir *readdir = dir_open (file_get_inode (f));
       /* Set pos */
-      dir_setpos(readdir, file_tell(f));
+      dir_setpos (readdir, file_tell (f));
       if (readdir == NULL)
         {
           sys_exit (-1);
           return -1;  // gets rid of warning
         }
-      bool retval = dir_readdir(readdir, name);
-      file_seek(f, dir_getpos(readdir));
+      bool retval = dir_readdir (readdir, name);
+      file_seek (f, dir_getpos(readdir));
       return retval;
     }
   sys_exit (-1);

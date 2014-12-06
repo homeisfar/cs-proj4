@@ -251,6 +251,13 @@ dir_remove (struct dir *dir, const char *name)
 
   if (inode_is_dir (inode))
     {
+      if (inode_opencnt (inode) > 3)
+        goto done;
+      if (thread_current ()->cur_dir != NULL)
+        {
+          if (dir_get_inode (thread_current ()->cur_dir) == inode)
+            goto done;
+        }
       struct dir *remdir = dir_open (inode);
       if (!dir_isempty (remdir))
         {
@@ -293,7 +300,6 @@ dir_getpos(struct dir *dir)
 bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
-    //printf("pos: %d\n", dir->pos);
   struct dir_entry e;
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) 
     {
@@ -301,7 +307,6 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
       if (e.in_use && (strcmp (e.name, ".") != 0) && (strcmp (e.name, "..") != 0))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
-            //printf("after pos: %d\n", dir->pos);
           return true;
         } 
     }
