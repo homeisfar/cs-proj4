@@ -36,6 +36,7 @@ dir_create_link (const char *parent_dir, const char *new_dir, block_sector_t sec
   return success;
 }
 
+/* Danny drove here */
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
@@ -226,6 +227,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   return success;
 }
 
+/* Charling drove here */
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
    which occurs only if there is no file with the given NAME. */

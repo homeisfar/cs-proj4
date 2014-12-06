@@ -358,18 +358,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       	    return bytes_written;
 
       	  // Zero out new block sector
-      	  // TODO: How to prevent user from seeing non-user written zeroes
       	  block_write (fs_device, alloc_sector, zeros);
 
       	  // If allocated sector contains offset, returns valid sector #;
       	  // Otherwise, loop until valid number granted.
       	  sector_idx = byte_to_sector (inode, offset);
       	}
-      /* Bytes left in inode, bytes left in sector, lesser of the two. */
-      // With file extension allowed, bytes left in inode is not useful here
       int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
-      //int min_left = inode_left < sector_left ? inode_left : sector_left;
-
       /* Number of bytes to actually write into this sector. */
       int chunk_size = size < sector_left ? size : sector_left;
       if (chunk_size <= 0)

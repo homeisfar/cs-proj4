@@ -113,6 +113,7 @@ do_format (void)
   printf ("done.\n");
 }
 
+/* Charling drove here */
 /* Navigates file hierarchy to get to desired directory.
   Returns null pointer if invalid path. */
 struct dir *
