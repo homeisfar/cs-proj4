@@ -164,12 +164,13 @@ inode_create (block_sector_t sector, off_t length, bool dir)
         		      i++;
         		    }
             }
-          disk_inode->length = length;  
-          block_write (fs_device, sector, disk_inode); 
           success = true; 
         }
+      disk_inode->length = length;  
+      block_write (fs_device, sector, disk_inode); 
       free (disk_inode);
     }
+  // printf(" %i\n", );
   return success;
 }
 
@@ -327,6 +328,7 @@ off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset) 
 {
+  off_t original_len = inode->data.length;
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
   uint8_t *bounce = NULL;
@@ -364,7 +366,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       	}
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       // With file extension allowed, bytes left in inode is not useful here
-      //off_t inode_left = inode_length (inode) - offset;
       int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
       //int min_left = inode_left < sector_left ? inode_left : sector_left;
 
@@ -406,7 +407,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     }
   free (bounce);
   
-  off_t final_len = (inode->data.length) > (offset + size) ? (inode->data.length) : (offset + size);
+  off_t final_len = original_len > (offset + size) ? original_len : (offset + size);
   inode->data.length = final_len;
   block_write (fs_device, inode->sector, &inode->data);
 

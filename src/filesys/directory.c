@@ -345,9 +345,12 @@ dir_mkdir (const char *name)
   if (!free_map_allocate (1, &sector)) 
     return false;
   parent_dir = filesys_pathfinder (name, filename);
-  success = dir_create (sector, 0) && dir_add (parent_dir, filename, sector);
+  success = parent_dir != NULL && dir_create (sector, 0) 
+            && dir_add (parent_dir, filename, sector);
+
   if (!success)
     free_map_release (sector, 1);
+
   dir_close (parent_dir);
   return success;
 }
